@@ -28,7 +28,7 @@
 #define STD_POINT		30
 #define GRADIENT_WIDTH  1440
 #define GRADIENT_HEIGHT 720
-#define CL 100                                                      // 이미지 테두리 
+#define CL 5                                                        // 이미지 테두리 
 
 #define PREV_LEFT	12
 #define PREV_TOP	50
@@ -44,6 +44,16 @@
 
 #define ZOOMBASE    1000
 
+typedef const unsigned char* LPCBYTE;
+typedef const int* LPCINT;
+typedef short* LPINT16;
+typedef const short* LPCINT16;
+
+#define LoInt16(L)      *(LPINT16)&L            //ARM에서는 선별적으로 사용할 것
+#define HiInt16(L)      *((LPINT16)&L+1)        //      "
+#define LoWord(DW)      *(LPWORD)&DW            //      "
+#define HiWord(DW)      *((LPWORD)&DW+1)        //      "
+
 //-------------------------------------------------------------------------------------------------
 // Global Variables
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
@@ -51,36 +61,36 @@ WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입
 WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름입니다.
 
 static int g_zoomVal = 100;
-static int g_panningX, g_panningY;              //Work영역좌표
-static int g_imgSzX = 3000, g_imgSzY = 4000;
+static int g_panningX, g_panningY;              // Work영역좌표
+static int g_imgSzX, g_imgSzY;                  // 원본이미지 px -> mm로 변환한 값
 static int g_textHeight = 300;
 
-static HWND g_hButtonOpenFileDialog;													// 파일열기 대화상자를 실행하기 위한 버튼의 핸들
-static HWND g_hEditFileToBeOpened;														// 파일의 경로와 이름을 가져오는 에디트 컨트롤의 핸들
-static char g_imgRoute[256];														    // 이미지 경로 ex)"C:\project\Banner\banner\girl.bmp"
+static HWND g_hButtonOpenFileDialog;			// 파일열기 대화상자를 실행하기 위한 버튼의 핸들
+static HWND g_hEditFileToBeOpened;				// 파일의 경로와 이름을 가져오는 에디트 컨트롤의 핸들
+static char g_imgRoute[256];					// 이미지 경로 ex)"C:\project\Banner\banner\girl.bmp"
 
-static int		g_textSz[3];															// 사용자가 콤보박스에서 선택한 글자 크기(pt)
-static char		g_textFont[100];														// 사용자가 콤보박스에서 선택한 글꼴
-static char*    g_textFontArr[3];														// 사용자가 선택한 글꼴을 모아놓은 배열
-static char		g_textStr[1024];														// 사용자가 입력한 텍스트
-static char*    g_textStrArr[3];														// 사용자가 입력한 텍스트를 모아놓은 배열
-static int		g_textCnt = 0;															// 텍스트 개수
-static RGBQUAD	g_textColor[3];															// 사용자가 선택한 글자 색상
+static int		g_textSz[3];					// 사용자가 콤보박스에서 선택한 글자 크기(pt)
+static char		g_textFont[100];				// 사용자가 콤보박스에서 선택한 글꼴
+static char*    g_textFontArr[3];				// 사용자가 선택한 글꼴을 모아놓은 배열
+static char		g_textStr[1024];				// 사용자가 입력한 텍스트
+static char*    g_textStrArr[3];			    // 사용자가 입력한 텍스트를 모아놓은 배열
+static int		g_textCnt = 0;					// 텍스트 개수
+static RGBQUAD	g_textColor[3];					// 사용자가 선택한 글자 색상
 
 //작업중인 이미지 관련
-static HBITMAP	g_hImageLoaded;															//로딩된 HBITMAP
-static int		g_ImageWidth, g_ImageHeight;											//조정된 이미지 크기
+static HBITMAP	g_hImageLoaded;					// 로딩된 HBITMAP
+static RECT     g_imgRect;                      // 이미지 좌표
 
 //작업중인 텍스트 관련
-static RECT g_textRect[3];																// 텍스트 외곽 좌표
-static int  g_prevTextSz;																// 미리보기에서 텍스트 크기
+static RECT g_textRect[3];						// 텍스트 외곽 좌표
+static int  g_prevTextSz;						// 미리보기에서 텍스트 크기
 
 //프린터 구조체
 struct PRINTERINFO
 {
-    int xRes;																			// A4 기준 pixel
+    int xRes;									// A4 기준 pixel
     int yRes;
-    int xSize;																			// A4 기준 mm
+    int xSize;									// A4 기준 mm
     int ySize;
     int xDpi;
     int yDpi;
@@ -88,14 +98,14 @@ struct PRINTERINFO
     int pW;
     int pH;
     int pOL;
-    int xResMtp;																		// a4 너비 사이즈 배수
-    int yResMtp;																		// a4 높이 사이즈 배수
+    int xResMtp;							    // a4 너비 사이즈 배수
+    int yResMtp;								// a4 높이 사이즈 배수
     int ng_ImageWidth;
     int ng_ImageHeight;
-    int currPage = 1;																	// 현재 페이지
-    int endPage;																		// 마지막 페이지
+    int currPage = 1;							// 현재 페이지
+    int endPage;								// 마지막 페이지
 };
-PRINTERINFO pi;																			// Printer Information
+PRINTERINFO pi;									// Printer Information
 
 //-----------------------------------------------------------------------------
 //      PrinterDC를 호출합니다
@@ -142,7 +152,7 @@ void WINAPI DrawCircle(HDC hDC, int X, int Y, int Rad)
 //-----------------------------------------------------------------------------
 //      WorkSpace 좌표와 Device 좌표 사이를 서로 변환
 //-----------------------------------------------------------------------------
-int W2D(int R)  { return MulDiv(R,              g_zoomVal, ZOOMBASE); }
+int W2D(int R)  { return MulDiv(R, g_zoomVal, ZOOMBASE); }                                  // 크기 변환하는 함수
 int W2DX(int X) { return MulDiv(X, g_zoomVal, ZOOMBASE); }
 int W2DY(int Y) { return MulDiv(Y, g_zoomVal, ZOOMBASE); }
 int W2DXImg(int X) { return MulDiv(X - g_panningX, g_zoomVal, ZOOMBASE); }                  // 이미지 부분에 사용(StretchBlt)
@@ -160,7 +170,7 @@ int D2WY(int Y) { return MulDiv(Y, ZOOMBASE, g_zoomVal) + g_panningY; }
 void WINAPI DrawImgBoundaryLine(HDC hdc)
 {
     SelectObject(hdc, GetStockObject(NULL_BRUSH));  //면을 칠하지 않도록 함
-    Rectangle(hdc, W2DXImg(0), W2DYImg(0), g_imgSzX, g_imgSzY);
+    Rectangle(hdc, W2DXImg(0), W2DYImg(0), W2DXImg(g_imgSzX), W2DYImg(g_imgSzY));
 }
 
 
@@ -171,12 +181,16 @@ void WINAPI DrawImgBoundaryLine(HDC hdc)
 void WINAPI LoadBmpImage(void)
 {
     BITMAP bm;
+    //int tx, ty;       // 원본 이미지(px)를 mm로 변환한 값을 잠시 넣어놓음
 
     if ((g_hImageLoaded = (HBITMAP)LoadImage(NULL, g_imgRoute, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION)) != NULL)
     {
         GetObject(g_hImageLoaded, sizeof(BITMAP), &bm);
-        //g_ImageWidth = bm.bmWidth;
-        //g_ImageHeight = bm.bmHeight;
+
+        //tx = (int)((bm.bmWidth / 25.4) * 120);       // 120은 이미지의 dpi를 의미한다(일단 정적으로 해놓음)
+        //ty = (int)((bm.bmHeight / 25.4) * 120);
+        g_imgSzX = (int)((bm.bmWidth / 25.4) * 120);       // 120은 이미지의 dpi를 의미한다(일단 정적으로 해놓음)
+        g_imgSzY = (int)((bm.bmHeight / 25.4) * 120);
     }
 }
 
@@ -185,17 +199,16 @@ void WINAPI LoadBmpImage(void)
 //-----------------------------------------------------------------------------
 //       원본이미지를 크기조절 후 화면에 출력
 //-----------------------------------------------------------------------------
-void WINAPI DrawStretchBitmap(HDC hDC, HBITMAP hBtm, int X1, int Y1, int X2, int Y2)
+void WINAPI DrawStretchBitmap(HDC hDC, HBITMAP hBtm, BITMAP bm, int X1, int Y1, int X2, int Y2)
 {
     HDC     hMemDC;
-    BITMAP  bm;
     HBITMAP hBtmOld;
-
     hMemDC = CreateCompatibleDC(hDC);
-    hBtmOld = (HBITMAP)SelectObject(hMemDC, hBtm);                               // hBtm가 선택되기 전의 핸들을 저장해 둔다
-    GetObject(g_hImageLoaded, sizeof(BITMAP), &bm);
+    hBtmOld = (HBITMAP)SelectObject(hMemDC, hBtm);                                          // hBtm가 선택되기 전의 핸들을 저장해 둔다
     StretchBlt(hDC, X1, Y1, X2, Y2, hMemDC, 0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY);
-    SelectObject(hMemDC, hBtmOld);                                               // hImage 선택을 해제하기 위해 hBtmOld을 선택한다
+    printf("원본(px) 가로: %d, 세로: %d -> ", bm.bmWidth, bm.bmHeight);
+    printf("수정(mm) 가로: %d, 세로: %d\n", X2, Y2);
+    SelectObject(hMemDC, hBtmOld);                                                          // hImage 선택을 해제하기 위해 hBtmOld을 선택한다
     DeleteDC(hMemDC);
 }
 
@@ -231,14 +244,14 @@ HFONT WINAPI MyCreateFont(int Height, BOOL BoldFg, BOOL ItalicFg, LPCSTR FontNam
     LOGFONT LF;
 
     GetFontInfo(FontName, &LF);
-    return CreateFont(Height,            //높이
-        0,           //MulDiv(Size, WidthRate, 200); //폭
-        0,           //0.1도 단위의 글자 방향
-        0,           //방향으로 설명되어 있으나 먹통임
-        BoldFg == 0 ? FW_DONTCARE : FW_BOLD, //글자 굵기
-        ItalicFg,    //1:이탤릭
-        0,           //1:밑줄문자
-        0,           //1:중앙통과선
+    return CreateFont(Height,                   //높이
+        0,                                      //MulDiv(Size, WidthRate, 200); //폭
+        0,                                      //0.1도 단위의 글자 방향
+        0,                                      //방향으로 설명되어 있으나 먹통임
+        BoldFg == 0 ? FW_DONTCARE : FW_BOLD,    //글자 굵기
+        ItalicFg,                               //1:이탤릭
+        0,                                      //1:밑줄문자
+        0,                                      //1:중앙통과선
         LF.lfCharSet,
         OUT_DEFAULT_PRECIS,
         CLIP_DEFAULT_PRECIS,
@@ -368,80 +381,6 @@ void WINAPI CreateComboBox(HWND hDlg)
 
 
 //-----------------------------------------------------------------------------
-//      모든 화면 그리는 동작
-//-----------------------------------------------------------------------------
-void WINAPI DrawAll(HWND hWnd, HDC hDC)
-{
-    int X, Y, px, py;
-    HFONT hFontOld;
-    RECT  R;
-
-    for (Y = 0; Y < PAPERYQTY; Y++)
-    {
-        for (X = 0; X < PAPERXQTY; X++)
-        {
-            px = X * PAPERXSIZE;
-            py = Y * PAPERYSIZE;
-            Rectangle(hDC, W2DX(px), W2DY(py), W2DX(px + PAPERXSIZE), W2DY(py + PAPERYSIZE));
-        }
-    }
-
-    DrawStretchBitmap(hDC, g_hImageLoaded, W2DX(0), W2DY(0), W2DXImg(g_imgSzX), W2DYImg(g_imgSzY));
-
-    hFontOld = (HFONT)SelectObject(hDC, MyCreateFont(W2D(g_textHeight), FALSE, FALSE, "궁서"));
-    SetRect(&R, W2DX(1000), W2DY(3000), W2DX(3000), W2DY(3500));
-    DrawText(hDC, "TEXT 테스트중", -1, &R, DT_LEFT);
-    DeleteObject(SelectObject(hDC, hFontOld));
-}
-
-
-
-//-----------------------------------------------------------------------------
-//      모든 화면 그리는 동작
-//-----------------------------------------------------------------------------
-void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
-{
-    static POINT oldP;
-
-    switch (Msg)
-    {
-    case WM_LBUTTONDOWN:
-        SetCapture(hWnd);
-        oldP.x = LOWORD(lPrm);
-        oldP.y = HIWORD(lPrm);
-        break;
-
-    case WM_MOUSEMOVE:
-        if (GetCapture() == hWnd)
-        {
-            g_panningX -= D2W(LOWORD(lPrm) - oldP.x);
-            g_panningY -= D2W(HIWORD(lPrm) - oldP.y);
-            InvalidateRect(hWnd, NULL, TRUE);
-            oldP.x = LOWORD(lPrm);
-            oldP.y = HIWORD(lPrm);
-        }
-        break;
-
-    case WM_LBUTTONUP:
-        ReleaseCapture();
-    }
-}
-
-
-
-//-----------------------------------------------------------------------------
-//      메인 윈도우의 이미지 테두리를 클릭했을 때, 꼭짓점(원)을 그립니다.
-//-----------------------------------------------------------------------------
-void WINAPI DrawImgVertex(HDC hdc)
-{
-    DrawCircle(hdc, g_ImageWidth + STD_POINT, (g_ImageHeight / 2) + STD_POINT, RADIUS);		// 우측 모서리 중앙
-    DrawCircle(hdc, (g_ImageWidth / 2) + STD_POINT, g_ImageHeight + STD_POINT, RADIUS);		// 아래 모서리 중앙
-    DrawCircle(hdc, g_ImageWidth + STD_POINT, g_ImageHeight + STD_POINT, RADIUS);			// 우측 하단 꼭짓점 
-}
-
-
-
-//-----------------------------------------------------------------------------
 //		윈도우 영역에서 글꼴, 색상, 크기는 여기서 모두 작업합니다
 //-----------------------------------------------------------------------------
 void WINAPI DrawTextAll(HWND hDlg)
@@ -453,7 +392,13 @@ void WINAPI DrawTextAll(HWND hDlg)
 
     for (int i = 0; i < g_textCnt; i++)
     {
-        hFont = CreateFont(g_textSz[i], 0, 0, 0, 0, 0, 0, 0, HANGEUL_CHARSET, 0, 0, 0, VARIABLE_PITCH | FF_ROMAN, TEXT(g_textFontArr[i]));
+        //hFontOld = (HFONT)SelectObject(hDC, MyCreateFont(W2D(g_textSz[0]), FALSE, FALSE, "궁서")); // {2: Bold, 3: Italic}
+        //SetRect(&R, W2DX(1000), W2DY(3000), W2DX(3000), W2DY(3500));
+        //DrawText(hDC, "TEXT 테스트중", -1, &R, DT_VCENTER | DT_WORDBREAK);
+        //DeleteObject(SelectObject(hDC, hFontOld));
+
+        // 잠시 첫 번째 인자는 W2D(g_textSz[i]) 였음
+        hFont = MyCreateFont(g_textSz[i], FALSE, FALSE, TEXT(g_textFontArr[i])); // {2: Bold, 3: Italic}
         oldFont = (HFONT)SelectObject(hdc, hFont);
 
         SetTextColor(hdc, RGB(g_textColor[i].rgbBlue, g_textColor[i].rgbGreen, g_textColor[i].rgbRed));
@@ -469,12 +414,52 @@ void WINAPI DrawTextAll(HWND hDlg)
         DeleteObject(hFont);
     }
     // 처음엔 PAINT 메세지가 발생하여 null, null, null로 찍힘
-    printf("g_textStrArr[0]: %s\n", g_textStrArr[0]);
-    printf("g_textStrArr[1]: %s\n", g_textStrArr[1]);
-    printf("g_textStrArr[2]: %s\n", g_textStrArr[2]);
-    printf("g_textCnt: %d\n", g_textCnt);
+    //printf("g_textStrArr[0]: %s\n", g_textStrArr[0]);
+    //printf("g_textStrArr[1]: %s\n", g_textStrArr[1]);
+    //printf("g_textStrArr[2]: %s\n", g_textStrArr[2]);
+    //printf("g_textCnt: %d\n", g_textCnt);
 
     ReleaseDC(hDlg, hdc);
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      모든 화면 그리는 동작
+//-----------------------------------------------------------------------------
+void WINAPI DrawAll(HWND hWnd, HDC hDC)
+{
+    BITMAP  bm;
+    int X, Y, px, py;
+
+    for (Y = 0; Y < PAPERYQTY; Y++)
+    {
+        for (X = 0; X < PAPERXQTY; X++)
+        {
+            px = X * PAPERXSIZE;
+            py = Y * PAPERYSIZE;
+            Rectangle(hDC, W2DX(px), W2DY(py), W2DX(px + PAPERXSIZE), W2DY(py + PAPERYSIZE));
+        }
+    }
+    GetObject(g_hImageLoaded, sizeof(BITMAP), &bm);
+
+    g_imgSzX = (int)((bm.bmWidth / 25.4) * 120);       // 120은 이미지의 dpi를 의미한다(일단 정적으로 해놓음)
+    g_imgSzY = (int)((bm.bmHeight / 25.4) * 120);
+
+    DrawStretchBitmap(hDC, g_hImageLoaded, bm, W2DX(0), W2DY(0), W2DXImg(g_imgSzX), W2DYImg(g_imgSzY));
+    DrawTextAll(hWnd);
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      메인 윈도우의 이미지 테두리를 클릭했을 때, 꼭짓점(원)을 그립니다.
+//-----------------------------------------------------------------------------
+void WINAPI DrawImgVertex(HDC hdc)
+{
+    DrawCircle(hdc, W2DXImg(g_imgSzX),         (W2DYImg(g_imgSzY) / 2),   RADIUS);		// 우측 모서리 중앙
+    DrawCircle(hdc, (W2DXImg(g_imgSzX) / 2),   W2DYImg(g_imgSzY),         RADIUS);		// 아래 모서리 중앙
+    DrawCircle(hdc, W2DXImg(g_imgSzX),         W2DYImg(g_imgSzY),         RADIUS);		// 우측 하단 꼭짓점 
 }
 
 
@@ -498,8 +483,142 @@ void WINAPI DrawSizeInfoLine(HWND hWnd)
 
 
 //-----------------------------------------------------------------------------
+//      이미지 크기를 조정할 위치정보를 리턴함
+//-----------------------------------------------------------------------------
+int WINAPI GetDragingMode(HWND hWnd, POINT P)
+{
+    HDC hdc = GetDC(hWnd);
+    RECT R = { 0, 0, 0, 0, };
+    int  DragingMode = VERTEX_NOSELECTED;
+
+    SetRect(&R, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) + CL, W2DY(g_imgSzY) + CL);
+    if (PtInRect(&R, P))
+        DragingMode = VERTEX_ADJUSTDIAGONAL;
+    else
+    {
+        SetRect(&R, W2DX(g_imgSzX) - CL, W2DY(0), W2DX(g_imgSzX) + CL, W2DY(g_imgSzY) - CL);
+        if (PtInRect(&R, P))
+            DragingMode = VERTEX_ADJUSTWIDTH;
+        else
+        {
+            SetRect(&R, W2DX(0), W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) + CL);
+            if (PtInRect(&R, P))
+                DragingMode = VERTEX_ADJUSTHEIGHT;
+            else
+            {
+                if (PtInRect(&g_textRect[0], P))
+                    DragingMode = VERTEX_INTEXT_1;
+                else if (PtInRect(&g_textRect[1], P))
+                    DragingMode = VERTEX_INTEXT_2;
+                else if (PtInRect(&g_textRect[2], P))
+                    DragingMode = VERTEX_INTEXT_3;
+            }
+        }
+    }
+    ReleaseDC(hWnd, hdc);
+
+    return DragingMode;
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      드래깅 모드를 처리합니다.
+//-----------------------------------------------------------------------------
+void WINAPI HandleDragingMode(HWND hWnd, LPARAM lParam, int DragingMode)
+{
+    int status = 0; // 몇 번째 텍스트를 클릭했는지 판단하기 위함 (0 ~ 2)
+
+    if (DragingMode == VERTEX_NOSELECTED)
+        return;
+
+    DrawSizeInfoLine(hWnd);         //기존 그려진 안내선을 지움(잔상처리)
+    if (DragingMode == VERTEX_ADJUSTWIDTH || DragingMode == VERTEX_ADJUSTDIAGONAL)
+    {
+        g_imgSzX = LoInt16(lParam);
+        //g_imgSzX = (int)((LoInt16(lParam) / 25.4) * 120);
+        //printf("(int)((LoInt16(lParam) / 25.4) * 120): %d\n", (int)((LoInt16(lParam) / 25.4) * 120));
+    }
+        
+    if (DragingMode == VERTEX_ADJUSTHEIGHT || DragingMode == VERTEX_ADJUSTDIAGONAL)
+    {
+        g_imgSzY = HiInt16(lParam);
+        //g_imgSzY = (int)((HiInt16(lParam) / 25.4) * 120);
+        //printf("(int)((HiInt16(lParam) / 25.4) * 120): %d\n", (int)((HiInt16(lParam) / 25.4) * 120));
+    }
+        
+    if (DragingMode == VERTEX_INTEXT_1)
+    {
+        status = 0;
+        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
+        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
+    }
+    else if (DragingMode == VERTEX_INTEXT_2)
+    {
+        status = 1;
+        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
+        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
+    }
+    else if (DragingMode == VERTEX_INTEXT_3)
+    {
+        status = 2;
+        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
+        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
+    }
+
+    DrawSizeInfoLine(hWnd);
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      모든 화면 그리는 동작
+//-----------------------------------------------------------------------------
+void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
+{
+    static int DragingMode = VERTEX_NOSELECTED;
+    static POINT oldP;
+
+    switch (Msg)
+    {
+    case WM_LBUTTONDOWN:
+        SetCapture(hWnd);
+        oldP.x = LoInt16(lPrm);
+        oldP.y = HiInt16(lPrm);
+
+        printf("DragingMode  시작\n");
+        if ((DragingMode = GetDragingMode(hWnd, oldP)) == VERTEX_NOSELECTED)
+            break;
+        printf("DragingMode: %d\n", DragingMode);
+        DrawSizeInfoLine(hWnd);
+
+        //printf("imgX: %d, imgY: %d\n", g_imgSzX, g_imgSzY);
+        //printf("W2DX(imgX): %d, W2DY(imgY): %d\n", W2DX(g_imgSzX), W2DY(g_imgSzY));
+        printf("P.x: %d, P.y: %d\n", oldP.x, oldP.y);
+        break;
+
+    case WM_MOUSEMOVE:
+        if (GetCapture() == hWnd)
+        {
+            HandleDragingMode(hWnd, lPrm, DragingMode);
+            g_panningX -= D2W(LoInt16(lPrm) - oldP.x);
+            g_panningY -= D2W(HiInt16(lPrm) - oldP.y);
+            InvalidateRect(hWnd, NULL, TRUE);
+            oldP.x = LoInt16(lPrm);
+            oldP.y = HiInt16(lPrm);
+        }
+        break;
+
+    case WM_LBUTTONUP:
+        ReleaseCapture();
+    }
+}
+
+
+
+//----------------------------------------------------------------------------
 //      파일을 열어 이미지를 선택합니다.
-//--------------------------------------------	---------------------------------
+//----------------------------------------------------------------------------
 BOOL WINAPI OpenImage(HWND hDlg, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR Filter)
 {
     OPENFILENAME ofn;
@@ -549,22 +668,22 @@ void WINAPI KeyProc(HWND hWnd, int key)
         break;
 
     case VK_LEFT:
-        g_panningX -= 100;
-        InvalidateRect(hWnd, NULL, TRUE);
-        break;
-
-    case VK_RIGHT:
         g_panningX += 100;
         InvalidateRect(hWnd, NULL, TRUE);
         break;
 
+    case VK_RIGHT:
+        g_panningX -= 100;
+        InvalidateRect(hWnd, NULL, TRUE);
+        break;
+
     case VK_UP:
-        g_panningY -= 100;
+        g_panningY += 100;
         InvalidateRect(hWnd, NULL, TRUE);
         break;
 
     case VK_DOWN:
-        g_panningY += 100;
+        g_panningY -= 100;
         InvalidateRect(hWnd, NULL, TRUE);
         break;
     }
@@ -638,7 +757,7 @@ BOOL CALLBACK TextDialogBoxProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM 
         PAINTSTRUCT ps;
         BeginPaint(hDlg, &ps);
         EndPaint(hDlg, &ps);
-        return true;
+        return TRUE;
 
     case WM_COMMAND:
     {
@@ -661,45 +780,6 @@ BOOL CALLBACK TextDialogBoxProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM 
 
     }
     return FALSE;
-}
-
-
-
-//-----------------------------------------------------------------------------
-//      드래깅 모드를 처리합니다.
-//-----------------------------------------------------------------------------
-void WINAPI HandleDragingMode(HWND hWnd, LPARAM lParam, int DragingMode)
-{
-    int status = 0; // 몇 번째 텍스트를 클릭했는지 판단하기 위함 (0 ~ 2)
-
-    if (DragingMode == VERTEX_NOSELECTED)
-        return;
-
-    DrawSizeInfoLine(hWnd);         //기존 그려진 안내선을 지움(잔상처리)
-    if (DragingMode == VERTEX_ADJUSTWIDTH || DragingMode == VERTEX_ADJUSTDIAGONAL)
-        g_ImageWidth = LOWORD(lParam);
-    if (DragingMode == VERTEX_ADJUSTHEIGHT || DragingMode == VERTEX_ADJUSTDIAGONAL)
-        g_ImageHeight = HIWORD(lParam);
-    if (DragingMode == VERTEX_INTEXT_1)
-    {
-        status = 0;
-        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
-        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
-    }
-    else if (DragingMode == VERTEX_INTEXT_2)
-    {
-        status = 1;
-        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
-        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
-    }
-    else if (DragingMode == VERTEX_INTEXT_3)
-    {
-        status = 2;
-        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
-        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
-    }
-
-    DrawSizeInfoLine(hWnd);
 }
 
 
@@ -737,53 +817,13 @@ void WINAPI ID_AddTextProc(HWND hWnd)
 
 
 //-----------------------------------------------------------------------------
-//      이미지 크기를 조정할 위치정보를 리턴함
-//-----------------------------------------------------------------------------
-int WINAPI GetDragingMode(HWND hWnd, POINT P)
-{
-    HDC hdc = GetDC(hWnd);
-    RECT R = { 0, 0, 0, 0, };
-    int  DragingMode = VERTEX_NOSELECTED;
-
-    SetRect(&R, g_imgSzX - CL, g_imgSzY - CL, g_imgSzX + CL, g_imgSzY + CL);
-    if (PtInRect(&R, P))
-        DragingMode = VERTEX_ADJUSTDIAGONAL;
-    else
-    {
-        SetRect(&R, g_imgSzX - CL, 0, g_imgSzX + CL, g_imgSzY - CL);
-        if (PtInRect(&R, P))
-            DragingMode = VERTEX_ADJUSTWIDTH;
-        else
-        {
-            SetRect(&R, 0, g_imgSzY - CL, g_imgSzX - CL, g_imgSzY + CL);
-            if (PtInRect(&R, P))
-                DragingMode = VERTEX_ADJUSTHEIGHT;
-            else
-            {
-                if (PtInRect(&g_textRect[0], P))
-                    DragingMode = VERTEX_INTEXT_1;
-                else if (PtInRect(&g_textRect[1], P))
-                    DragingMode = VERTEX_INTEXT_2;
-                else if (PtInRect(&g_textRect[2], P))
-                    DragingMode = VERTEX_INTEXT_3;
-            }
-        }
-    }
-    ReleaseDC(hWnd, hdc);
-
-    return DragingMode;
-}
-
-
-
-//-----------------------------------------------------------------------------
 //      메인 윈도우 메세지 처리
 //-----------------------------------------------------------------------------
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     MousePanning(hWnd, message, wParam, lParam);
     POINT P;
-    static int DragingMode = VERTEX_NOSELECTED;
+
     switch (message)
     {
     case WM_CREATE:         //윈도우가 생성될 때 한번 옴
@@ -797,7 +837,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_PAINT:          //화면을 그려야 할 이유가 생겼을 떄
         PAINTSTRUCT PS;
-        DrawTextAll(hWnd);
+        //DrawTextAll(hWnd);
         BeginPaint(hWnd, &PS);
         DrawAll(hWnd, PS.hdc);
         EndPaint(hWnd, &PS);
@@ -837,19 +877,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_KEYDOWN:   
         KeyProc(hWnd, wParam);
-        return 0;
-
-    case WM_LBUTTONDOWN:   
-        if (g_hImageLoaded == NULL) break;
-
-        P.x = LOWORD(lParam);
-        P.y = HIWORD(lParam);
-
-        if ((DragingMode = GetDragingMode(hWnd, P)) == VERTEX_NOSELECTED)
-            break;
-
-        printf("DragingMode = %d\n", DragingMode);
-        DrawSizeInfoLine(hWnd);
         return 0;
     }
 
@@ -910,7 +937,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //-----------------------------------------------------------------------------
 //      WIN32 API 어플리케이션 메인
 //-----------------------------------------------------------------------------
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR    lpCmdLine, _In_ int       nCmdShow)
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);

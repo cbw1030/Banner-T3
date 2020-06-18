@@ -1,2 +1,4 @@
 C:\Users\wdww1\source\repos\Banner-T3\Debug\Banner-T3.exe
 C:\Users\wdww1\source\repos\Banner-T3\Debug\Banner-T3.pdb
+C:\project\Banner-T3\Banner-T3\Debug\Banner-T3.exe
+C:\project\Banner-T3\Banner-T3\Debug\Banner-T3.pdb
