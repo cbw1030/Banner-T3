@@ -14,6 +14,8 @@
 #define IDC_BANNERT3                    109
 #define IDR_MAINFRAME                   128
 #define IDD_ADD_TEXT_DLG                130
+#define IDD_DIALOG1                     131
+#define ID_PRINT_DIALOG                 131
 #define IDC_OPEN_FILE_BTN               1000
 #define IDC_IMG_ROUTE_EDIT              1001
 #define IDSTRING                        1002
@@ -35,7 +37,7 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
-#define _APS_NEXT_RESOURCE_VALUE        131
+#define _APS_NEXT_RESOURCE_VALUE        132
 #define _APS_NEXT_COMMAND_VALUE         32778
 #define _APS_NEXT_CONTROL_VALUE         1006
 #define _APS_NEXT_SYMED_VALUE           110

@@ -16,28 +16,28 @@
 #define countof(strucName) (sizeof(strucName) / sizeof(strucName[0]))
 
 #define VERTEX_NOSELECTED       -2
-#define VERTEX_INTEXT_1			-3
-#define VERTEX_INTEXT_2			-4
-#define VERTEX_INTEXT_3			-5
+#define VERTEX_INTEXT_1         -3
+#define VERTEX_INTEXT_2         -4
+#define VERTEX_INTEXT_3         -5
 
 #define VERTEX_ADJUSTWIDTH      0
 #define VERTEX_ADJUSTHEIGHT     1
 #define VERTEX_ADJUSTDIAGONAL   2
 #define VERTEX_IMAGE_LENGTH     3
 
-#define STD_POINT		30
+#define STD_POINT       30
 #define GRADIENT_WIDTH  1440
 #define GRADIENT_HEIGHT 720
-#define CL 5                                                        // 이미지 테두리 
+#define CL 5                                                        // 이미지 테두리
 
-#define PREV_LEFT	12
-#define PREV_TOP	50
+#define PREV_LEFT   12
+#define PREV_TOP    50
 #define PREV_RIGHT  533
 #define PREV_BOTTOM 780
 
 //작업 데이터
-#define PAPERXQTY   6
-#define PAPERYQTY   3
+#define PAPERXQTY   3
+#define PAPERYQTY   2
 
 #define PAPERXSIZE  2100                                            // A4 가로 mm
 #define PAPERYSIZE  2970                                            // A4 세로 mm
@@ -62,35 +62,34 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름�
 
 static int g_zoomVal = 100;
 static int g_panningX, g_panningY;              // Work영역좌표
-static int g_imgSzX, g_imgSzY;                  // 원본이미지 px -> mm로 변환한 값
+static int g_imgSzX, g_imgSzY;                  // Work영역 상의 이미지 크기
 static int g_textHeight = 300;
 
-static HWND g_hButtonOpenFileDialog;			// 파일열기 대화상자를 실행하기 위한 버튼의 핸들
-static HWND g_hEditFileToBeOpened;				// 파일의 경로와 이름을 가져오는 에디트 컨트롤의 핸들
-static char g_imgRoute[256];					// 이미지 경로 ex)"C:\project\Banner\banner\girl.bmp"
+static HWND g_hButtonOpenFileDialog;            // 파일열기 대화상자를 실행하기 위한 버튼의 핸들
+static HWND g_hEditFileToBeOpened;              // 파일의 경로와 이름을 가져오는 에디트 컨트롤의 핸들
+static char g_imgRoute[256];                    // 이미지 경로 ex)"C:\project\Banner\banner\girl.bmp"
 
-static int		g_textSz[3];					// 사용자가 콤보박스에서 선택한 글자 크기(pt)
-static char		g_textFont[100];				// 사용자가 콤보박스에서 선택한 글꼴
-static char*    g_textFontArr[3];				// 사용자가 선택한 글꼴을 모아놓은 배열
-static char		g_textStr[1024];				// 사용자가 입력한 텍스트
-static char*    g_textStrArr[3];			    // 사용자가 입력한 텍스트를 모아놓은 배열
-static int		g_textCnt = 0;					// 텍스트 개수
-static RGBQUAD	g_textColor[3];					// 사용자가 선택한 글자 색상
+static int      g_textSz[3];                    // 사용자가 콤보박스에서 선택한 글자 크기(pt)
+static char* g_textFontArr[3];               // 사용자가 선택한 글꼴을 모아놓은 배열
+static char* g_textStrArr[3];                // 사용자가 입력한 텍스트를 모아놓은 배열
+static int      g_textCnt = 0;                  // 텍스트 개수
+static RGBQUAD  g_textColor[3];                 // 사용자가 선택한 글자 색상
 
 //작업중인 이미지 관련
-static HBITMAP	g_hImageLoaded;					// 로딩된 HBITMAP
+static HPEN     g_hPenPapaer;
+static HBITMAP  g_hImageLoaded;                 // 로딩된 HBITMAP
 static RECT     g_imgRect;                      // 이미지 좌표
 
 //작업중인 텍스트 관련
-static RECT g_textRect[3];						// 텍스트 외곽 좌표
-static int  g_prevTextSz;						// 미리보기에서 텍스트 크기
+static RECT g_textRect[3];                      // 텍스트 외곽 좌표
+static int  g_prevTextSz;                       // 미리보기에서 텍스트 크기
 
 //프린터 구조체
 struct PRINTERINFO
 {
-    int xRes;									// A4 기준 pixel
+    int xRes;                                   // A4 기준 pixel
     int yRes;
-    int xSize;									// A4 기준 mm
+    int xSize;                                  // A4 기준 mm
     int ySize;
     int xDpi;
     int yDpi;
@@ -98,21 +97,21 @@ struct PRINTERINFO
     int pW;
     int pH;
     int pOL;
-    int xResMtp;							    // a4 너비 사이즈 배수
-    int yResMtp;								// a4 높이 사이즈 배수
+    int xResMtp;                                // a4 너비 사이즈 배수
+    int yResMtp;                                // a4 높이 사이즈 배수
     int ng_ImageWidth;
     int ng_ImageHeight;
-    int currPage = 1;							// 현재 페이지
-    int endPage;								// 마지막 페이지
+    int currPage;                           // 현재 페이지
+    int endPage;                                // 마지막 페이지
 };
-PRINTERINFO pi;									// Printer Information
+PRINTERINFO pi;                                 // Printer Information
 
 //-----------------------------------------------------------------------------
 //      PrinterDC를 호출합니다
 //-----------------------------------------------------------------------------
 HDC WINAPI GetPrinterDC(HWND Hwnd)
 {
-    HDC hdc;
+    BOOL Rslt;
     PRINTDLG pd;
 
     memset(&pd, 0, sizeof(PRINTDLG));
@@ -121,9 +120,8 @@ HDC WINAPI GetPrinterDC(HWND Hwnd)
     pd.Flags = PD_RETURNDC; // PD_ALLPAGES | PD_RETURNDC | PD_NOSELECTION | PD_ENABLEPRINTTEMPLATE | PD_ENABLEPRINTHOOK
 
     // Retrieves the printer DC
-    PrintDlg(&pd);
-    hdc = pd.hDC;
-    return hdc;
+    Rslt = PrintDlg(&pd);
+    return Rslt ? pd.hDC : NULL;
 }
 
 
@@ -152,13 +150,11 @@ void WINAPI DrawCircle(HDC hDC, int X, int Y, int Rad)
 //-----------------------------------------------------------------------------
 //      WorkSpace 좌표와 Device 좌표 사이를 서로 변환
 //-----------------------------------------------------------------------------
-int W2D(int R)  { return MulDiv(R, g_zoomVal, ZOOMBASE); }                                  // 크기 변환하는 함수
-int W2DX(int X) { return MulDiv(X, g_zoomVal, ZOOMBASE); }
-int W2DY(int Y) { return MulDiv(Y, g_zoomVal, ZOOMBASE); }
-int W2DXImg(int X) { return MulDiv(X - g_panningX, g_zoomVal, ZOOMBASE); }                  // 이미지 부분에 사용(StretchBlt)
-int W2DYImg(int Y) { return MulDiv(Y - g_panningY, g_zoomVal, ZOOMBASE); }                  // 이미지 부분에 사용(StretchBlt)
+int W2D(int R) { return MulDiv(R, g_zoomVal, ZOOMBASE); }                      // 크기 변환하는 함수
+int W2DX(int X) { return MulDiv(X - g_panningX, g_zoomVal, ZOOMBASE); }         // 이미지 부분에 사용(StretchBlt)
+int W2DY(int Y) { return MulDiv(Y - g_panningY, g_zoomVal, ZOOMBASE); }         // 이미지 부분에 사용(StretchBlt)
 
-int D2W(int R)  { return MulDiv(R, ZOOMBASE, g_zoomVal); }
+int D2W(int R) { return MulDiv(R, ZOOMBASE, g_zoomVal); }
 int D2WX(int X) { return MulDiv(X, ZOOMBASE, g_zoomVal) + g_panningX; }
 int D2WY(int Y) { return MulDiv(Y, ZOOMBASE, g_zoomVal) + g_panningY; }
 
@@ -170,7 +166,7 @@ int D2WY(int Y) { return MulDiv(Y, ZOOMBASE, g_zoomVal) + g_panningY; }
 void WINAPI DrawImgBoundaryLine(HDC hdc)
 {
     SelectObject(hdc, GetStockObject(NULL_BRUSH));  //면을 칠하지 않도록 함
-    Rectangle(hdc, W2DXImg(0), W2DYImg(0), W2DXImg(g_imgSzX), W2DYImg(g_imgSzY));
+    Rectangle(hdc, W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));
 }
 
 
@@ -199,15 +195,17 @@ void WINAPI LoadBmpImage(void)
 //-----------------------------------------------------------------------------
 //       원본이미지를 크기조절 후 화면에 출력
 //-----------------------------------------------------------------------------
-void WINAPI DrawStretchBitmap(HDC hDC, HBITMAP hBtm, BITMAP bm, int X1, int Y1, int X2, int Y2)
+void WINAPI DrawStretchBitmap(HDC hDC, HBITMAP hBtm, int X1, int Y1, int X2, int Y2)
 {
     HDC     hMemDC;
     HBITMAP hBtmOld;
+    BITMAP  bm;
+
+    GetObject(hBtm, sizeof(BITMAP), &bm);
+
     hMemDC = CreateCompatibleDC(hDC);
     hBtmOld = (HBITMAP)SelectObject(hMemDC, hBtm);                                          // hBtm가 선택되기 전의 핸들을 저장해 둔다
-    StretchBlt(hDC, X1, Y1, X2, Y2, hMemDC, 0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY);
-    printf("원본(px) 가로: %d, 세로: %d -> ", bm.bmWidth, bm.bmHeight);
-    printf("수정(mm) 가로: %d, 세로: %d\n", X2, Y2);
+    StretchBlt(hDC, X1, Y1, X2 - X1, Y2 - Y1, hMemDC, 0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY);
     SelectObject(hMemDC, hBtmOld);                                                          // hImage 선택을 해제하기 위해 hBtmOld을 선택한다
     DeleteDC(hMemDC);
 }
@@ -263,25 +261,31 @@ HFONT WINAPI MyCreateFont(int Height, BOOL BoldFg, BOOL ItalicFg, LPCSTR FontNam
 
 
 //-----------------------------------------------------------------------------
-//		글꼴, 색상는 여기서 모두 작업합니다
+//      글꼴, 색상는 여기서 모두 작업합니다
 //-----------------------------------------------------------------------------
-void WINAPI SaveTextInfo(HWND hDlg)
+void WINAPI SaveTextInfo(HWND hWnd)
 {
-    GetDlgItemText(hDlg, IDSTRING, g_textStr, sizeof(g_textStr));
-    GetDlgItemText(hDlg, IDFONT, g_textFont, sizeof(g_textFont));
-    g_textSz[g_textCnt] = GetDlgItemInt(hDlg, IDSIZE, NULL, FALSE);
+    HDC   hDC;
+    HFONT hFont, oldFont;
+    SIZE  S;
 
     if (g_textStrArr[g_textCnt] == NULL)
     {
-        g_textStrArr[g_textCnt] = (char*)malloc(sizeof(char) * sizeof(g_textStr));
-        g_textFontArr[g_textCnt] = (char*)malloc(sizeof(char) * sizeof(g_textFont));
-    }
+        g_textSz[g_textCnt] = GetDlgItemInt(hWnd, IDSIZE, NULL, FALSE) * 10;
+        g_textStrArr[g_textCnt] = (char*)malloc(1024);
+        g_textFontArr[g_textCnt] = (char*)malloc(100);
+        GetDlgItemText(hWnd, IDSTRING, g_textStrArr[g_textCnt], 1024);
+        GetDlgItemText(hWnd, IDFONT, g_textFontArr[g_textCnt], 100);
 
-    if (g_textCnt != 3)
-    {
-        strcpy(g_textStrArr[g_textCnt], g_textStr);
-        strcpy(g_textFontArr[g_textCnt], g_textFont);
-        g_textCnt++;
+        hDC = GetDC(hWnd);
+        hFont = MyCreateFont(g_textSz[g_textCnt], FALSE, FALSE, g_textFontArr[g_textCnt]);
+        oldFont = (HFONT)SelectObject(hDC, hFont);
+
+        GetTextExtentPoint32(hDC, g_textStrArr[g_textCnt], lstrlen(g_textStrArr[g_textCnt]), &S);
+        SetRect(&g_textRect[g_textCnt], 0, 0, S.cx, S.cy);
+
+        DeleteObject(SelectObject(hDC, oldFont));
+        ReleaseDC(hWnd, hDC);
     }
 }
 
@@ -293,9 +297,9 @@ void WINAPI SaveTextInfo(HWND hDlg)
 RGBQUAD colorConverter(int hexValue)
 {
     RGBQUAD rgbColor;
-    rgbColor.rgbRed = ((hexValue >> 16) & 0xFF);	// Extract the RR byte
-    rgbColor.rgbGreen = ((hexValue >> 8) & 0xFF);	// Extract the GG byte
-    rgbColor.rgbBlue = ((hexValue) & 0xFF);			// Extract the BB byte
+    rgbColor.rgbRed = ((hexValue >> 16) & 0xFF);    // Extract the RR byte
+    rgbColor.rgbGreen = ((hexValue >> 8) & 0xFF);   // Extract the GG byte
+    rgbColor.rgbBlue = ((hexValue) & 0xFF);         // Extract the BB byte
 
     return rgbColor;
 }
@@ -305,7 +309,7 @@ RGBQUAD colorConverter(int hexValue)
 //-----------------------------------------------------------------------------
 //      글자 색상을 처리합니다.
 //-----------------------------------------------------------------------------
-void WINAPI ChoiceTextColor(HWND hDlg)
+void WINAPI ChoiceTextColor(HWND hWnd)
 {
     COLORREF textColor; // 사용자가 선택한 색상
     COLORREF crTemp[16];
@@ -313,7 +317,7 @@ void WINAPI ChoiceTextColor(HWND hDlg)
 
     memset(&col, 0, sizeof(CHOOSECOLOR));
     col.lStructSize = sizeof(CHOOSECOLOR);
-    col.hwndOwner = hDlg;
+    col.hwndOwner = hWnd;
 
     col.lpCustColors = crTemp;
     col.Flags = 0;
@@ -322,40 +326,20 @@ void WINAPI ChoiceTextColor(HWND hDlg)
     {
         textColor = col.rgbResult;
         g_textColor[g_textCnt] = colorConverter(textColor);
-        //printf("Color: %lu\n", textColor); // 사용자가 선택한 색상 십진법으로 출력      
+        //printf("Color: %lu\n", textColor); // 사용자가 선택한 색상 십진법으로 출력
         //printf("RGB(%u, %u, %u)\n", g_textColor.rgbRed, g_textColor.rgbGreen, g_textColor.rgbBlue);
     }
 }
 
 
 
-//-----------------------------------------------------------------------------
-//      프린터를 선택하면 해당 프린터의 정보를 읽습니다.
-//-----------------------------------------------------------------------------
-HDC WINAPI ReadPrinterInfo(HWND hWnd)
-{
-    HDC prn = GetPrinterDC(hWnd);
-
-    pi.xRes = GetDeviceCaps(prn, HORZRES);
-    pi.yRes = GetDeviceCaps(prn, VERTRES);
-    pi.xSize = GetDeviceCaps(prn, HORZSIZE);
-    pi.ySize = GetDeviceCaps(prn, VERTSIZE);
-    pi.xDpi = GetDeviceCaps(prn, LOGPIXELSX);
-    pi.yDpi = GetDeviceCaps(prn, LOGPIXELSY);
-
-    printf("X크기(픽셀)=%d, Y크기(픽셀)=%d\n", pi.xRes, pi.yRes);
-    printf("X크기(mm)=%d, Y크기(mm)=%d\n", pi.xSize, pi.ySize);
-    printf("X DPI=%d, Y DPI=%d\n\n", pi.xDpi, pi.yDpi);
-
-    return prn;
-}
 
 
 
 //-----------------------------------------------------------------------------
 //      글꼴, 글자크기 콤보박스는 여기서 작업합니다
 //-----------------------------------------------------------------------------
-void WINAPI CreateComboBox(HWND hDlg)
+void WINAPI CreateComboBox(HWND hWnd)
 {
     HWND fontDlg, szDlg;
     BOOL fontInit, szInit;
@@ -363,11 +347,11 @@ void WINAPI CreateComboBox(HWND hDlg)
     char fonts[][100] = { "궁서", "굴림", "돋움", "나눔고딕", "HY견고딕" };
     char sz[][100] = { "10", "11", "12", "13", "14", "16", "18", "20", "24", "28", "32", "36", "40", "48", "72", "96", "120" };
 
-    fontInit = SetDlgItemText(hDlg, IDFONT, fonts[0]);
-    szInit = SetDlgItemText(hDlg, IDSIZE, sz[0]);
+    fontInit = SetDlgItemText(hWnd, IDFONT, fonts[0]);
+    szInit = SetDlgItemText(hWnd, IDSIZE, sz[0]);
 
-    fontDlg = GetDlgItem(hDlg, IDFONT);
-    szDlg = GetDlgItem(hDlg, IDSIZE);
+    fontDlg = GetDlgItem(hWnd, IDFONT);
+    szDlg = GetDlgItem(hWnd, IDSIZE);
 
     for (int i = 0; i < 5; i++)
         SendMessage(fontDlg, CB_ADDSTRING, 0, (LPARAM)fonts[i]);
@@ -375,62 +359,49 @@ void WINAPI CreateComboBox(HWND hDlg)
     for (int i = 0; i < 17; i++)
         SendMessage(szDlg, CB_ADDSTRING, 0, (LPARAM)sz[i]);
 
-    SetFocus(GetDlgItem(hDlg, IDSTRING)); // 적용이 왜 안되지..
+    SetFocus(GetDlgItem(hWnd, IDSTRING)); // 적용이 왜 안되지..
 }
 
 
 
 //-----------------------------------------------------------------------------
-//		윈도우 영역에서 글꼴, 색상, 크기는 여기서 모두 작업합니다
+//      윈도우 영역에서 글꼴, 색상, 크기는 여기서 모두 작업합니다
 //-----------------------------------------------------------------------------
-void WINAPI DrawTextAll(HWND hDlg)
+void WINAPI DrawTextAll(HWND hWnd, HDC hDC)
 {
-    HDC hdc = GetDC(hDlg);
-    POINT pt;
-    GetCursorPos(&pt);
+    int   i;
+    RECT  R;
     HFONT hFont, oldFont;
 
-    for (int i = 0; i < g_textCnt; i++)
+    for (i = 0; i < g_textCnt; i++)
     {
-        //hFontOld = (HFONT)SelectObject(hDC, MyCreateFont(W2D(g_textSz[0]), FALSE, FALSE, "궁서")); // {2: Bold, 3: Italic}
-        //SetRect(&R, W2DX(1000), W2DY(3000), W2DX(3000), W2DY(3500));
-        //DrawText(hDC, "TEXT 테스트중", -1, &R, DT_VCENTER | DT_WORDBREAK);
-        //DeleteObject(SelectObject(hDC, hFontOld));
+        SetRect(&R, W2DX(g_textRect[i].left), W2DY(g_textRect[i].top), W2DX(g_textRect[i].right), W2DY(g_textRect[i].bottom));
 
-        // 잠시 첫 번째 인자는 W2D(g_textSz[i]) 였음
-        hFont = MyCreateFont(g_textSz[i], FALSE, FALSE, TEXT(g_textFontArr[i])); // {2: Bold, 3: Italic}
-        oldFont = (HFONT)SelectObject(hdc, hFont);
+        hFont = MyCreateFont(W2D(g_textSz[i]), FALSE, FALSE, g_textFontArr[i]); // {2: Bold, 3: Italic}
+        oldFont = (HFONT)SelectObject(hDC, hFont);
 
-        SetTextColor(hdc, RGB(g_textColor[i].rgbBlue, g_textColor[i].rgbGreen, g_textColor[i].rgbRed));
-        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hDC, RGB(g_textColor[i].rgbBlue, g_textColor[i].rgbGreen, g_textColor[i].rgbRed));
+        SetBkMode(hDC, TRANSPARENT);
 
-        //SelectClipRgn(hdc, NULL); // 우선 전체영역을 출력하기 위해 NULL처리
-        //IntersectClipRect(hdc, STD_POINT, STD_POINT, g_ImageWidth + STD_POINT, g_ImageHeight + STD_POINT); // 미리보기 영역에만 이미지를 출력하기 위함
+        DrawTextEx(hDC, g_textStrArr[i], -1, &R, DT_VCENTER | DT_WORDBREAK, NULL);      //실제 문자열을 찍는 문장. rt에 출력한다.
 
-        DrawTextEx(hdc, g_textStrArr[i], -1, &g_textRect[i], DT_CALCRECT, NULL);					//실제 문자열은 찍지 않고, 그려질 area만 측정되어 rt에 저장된다.
-        DrawTextEx(hdc, g_textStrArr[i], -1, &g_textRect[i], DT_VCENTER | DT_WORDBREAK, NULL);		//실제 문자열을 찍는 문장. rt에 출력한다.
-
-        SelectObject(hdc, oldFont);
+        SelectObject(hDC, oldFont);
         DeleteObject(hFont);
     }
-    // 처음엔 PAINT 메세지가 발생하여 null, null, null로 찍힘
-    //printf("g_textStrArr[0]: %s\n", g_textStrArr[0]);
-    //printf("g_textStrArr[1]: %s\n", g_textStrArr[1]);
-    //printf("g_textStrArr[2]: %s\n", g_textStrArr[2]);
-    //printf("g_textCnt: %d\n", g_textCnt);
-
-    ReleaseDC(hDlg, hdc);
 }
+
 
 
 
 //-----------------------------------------------------------------------------
 //      모든 화면 그리는 동작
 //-----------------------------------------------------------------------------
-void WINAPI DrawAll(HWND hWnd, HDC hDC)
+void WINAPI DrawPaper(HWND hWnd, HDC hDC)
 {
-    BITMAP  bm;
     int X, Y, px, py;
+
+    SelectObject(hDC, g_hPenPapaer);
+    SelectObject(hDC, GetStockObject(NULL_BRUSH));
 
     for (Y = 0; Y < PAPERYQTY; Y++)
     {
@@ -441,13 +412,18 @@ void WINAPI DrawAll(HWND hWnd, HDC hDC)
             Rectangle(hDC, W2DX(px), W2DY(py), W2DX(px + PAPERXSIZE), W2DY(py + PAPERYSIZE));
         }
     }
-    GetObject(g_hImageLoaded, sizeof(BITMAP), &bm);
+}
 
-    g_imgSzX = (int)((bm.bmWidth / 25.4) * 120);       // 120은 이미지의 dpi를 의미한다(일단 정적으로 해놓음)
-    g_imgSzY = (int)((bm.bmHeight / 25.4) * 120);
 
-    DrawStretchBitmap(hDC, g_hImageLoaded, bm, W2DX(0), W2DY(0), W2DXImg(g_imgSzX), W2DYImg(g_imgSzY));
-    DrawTextAll(hWnd);
+
+
+//-----------------------------------------------------------------------------
+//      모든 화면 그리는 동작
+//-----------------------------------------------------------------------------
+void WINAPI DrawAll(HWND hWnd, HDC hDC)
+{
+    DrawStretchBitmap(hDC, g_hImageLoaded, W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));
+    DrawTextAll(hWnd, hDC);
 }
 
 
@@ -457,9 +433,9 @@ void WINAPI DrawAll(HWND hWnd, HDC hDC)
 //-----------------------------------------------------------------------------
 void WINAPI DrawImgVertex(HDC hdc)
 {
-    DrawCircle(hdc, W2DXImg(g_imgSzX),         (W2DYImg(g_imgSzY) / 2),   RADIUS);		// 우측 모서리 중앙
-    DrawCircle(hdc, (W2DXImg(g_imgSzX) / 2),   W2DYImg(g_imgSzY),         RADIUS);		// 아래 모서리 중앙
-    DrawCircle(hdc, W2DXImg(g_imgSzX),         W2DYImg(g_imgSzY),         RADIUS);		// 우측 하단 꼭짓점 
+    DrawCircle(hdc, W2DX(g_imgSzX), (W2DY(g_imgSzY) / 2), RADIUS);      // 우측 모서리 중앙
+    DrawCircle(hdc, (W2DX(g_imgSzX) / 2), W2DY(g_imgSzY), RADIUS);      // 아래 모서리 중앙
+    DrawCircle(hdc, W2DX(g_imgSzX), W2DY(g_imgSzY), RADIUS);      // 우측 하단 꼭짓점
 }
 
 
@@ -474,8 +450,7 @@ void WINAPI DrawSizeInfoLine(HWND hWnd)
     SetROP2(hdc, R2_XORPEN);   // GDI함수가 화면에 출력을 내보낼 때 화면에 이미 출력되어 있는 그림과 새로 그려지는 그림과의 관계를 정의하는 함수
     SelectObject(hdc, GetStockObject(WHITE_PEN));
     DrawImgBoundaryLine(hdc);  // 이미지 경계선
-    DrawTextAll(hWnd);
-    DrawImgVertex(hdc);		   // 이미지 꼭짓점 
+    DrawImgVertex(hdc);        // 이미지 꼭짓점
     InvalidateRect(hWnd, NULL, FALSE); // 적용하면 텍스트 잔상처리가 해결되지만 반짝거리고 안하면 텍스트 잔상처리가 해결안됨
     ReleaseDC(hWnd, hdc);
 }
@@ -487,36 +462,31 @@ void WINAPI DrawSizeInfoLine(HWND hWnd)
 //-----------------------------------------------------------------------------
 int WINAPI GetDragingMode(HWND hWnd, POINT P)
 {
-    HDC hdc = GetDC(hWnd);
-    RECT R = { 0, 0, 0, 0, };
-    int  DragingMode = VERTEX_NOSELECTED;
+    int  i, DragingMode = VERTEX_NOSELECTED;
+    HDC  hdc;
+    RECT R;
+    static CONST int TextSelMode[] = { VERTEX_INTEXT_1, VERTEX_INTEXT_2, VERTEX_INTEXT_3 };
+
+    hdc = GetDC(hWnd);
+
+    for (i = 0; i < g_textCnt; i++)
+    {
+        SetRect(&R, W2DX(g_textRect[i].left), W2DY(g_textRect[i].top), W2DX(g_textRect[i].right), W2DY(g_textRect[i].bottom));
+        if (PtInRect(&R, P)) { DragingMode = TextSelMode[i]; goto ProcExit; }
+    }
 
     SetRect(&R, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) + CL, W2DY(g_imgSzY) + CL);
-    if (PtInRect(&R, P))
-        DragingMode = VERTEX_ADJUSTDIAGONAL;
-    else
-    {
-        SetRect(&R, W2DX(g_imgSzX) - CL, W2DY(0), W2DX(g_imgSzX) + CL, W2DY(g_imgSzY) - CL);
-        if (PtInRect(&R, P))
-            DragingMode = VERTEX_ADJUSTWIDTH;
-        else
-        {
-            SetRect(&R, W2DX(0), W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) + CL);
-            if (PtInRect(&R, P))
-                DragingMode = VERTEX_ADJUSTHEIGHT;
-            else
-            {
-                if (PtInRect(&g_textRect[0], P))
-                    DragingMode = VERTEX_INTEXT_1;
-                else if (PtInRect(&g_textRect[1], P))
-                    DragingMode = VERTEX_INTEXT_2;
-                else if (PtInRect(&g_textRect[2], P))
-                    DragingMode = VERTEX_INTEXT_3;
-            }
-        }
-    }
-    ReleaseDC(hWnd, hdc);
+    if (PtInRect(&R, P)) { DragingMode = VERTEX_ADJUSTDIAGONAL; goto ProcExit; }
 
+    SetRect(&R, W2DX(g_imgSzX) - CL, W2DY(0), W2DX(g_imgSzX) + CL, W2DY(g_imgSzY) - CL);
+    if (PtInRect(&R, P)) { DragingMode = VERTEX_ADJUSTWIDTH; goto ProcExit; }
+
+    SetRect(&R, W2DX(0), W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) + CL);
+    if (PtInRect(&R, P)) { DragingMode = VERTEX_ADJUSTHEIGHT; goto ProcExit; }
+
+ProcExit:
+    ReleaseDC(hWnd, hdc);
+    //printf("DragingMode=%d\n",DragingMode);
     return DragingMode;
 }
 
@@ -525,45 +495,22 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
 //-----------------------------------------------------------------------------
 //      드래깅 모드를 처리합니다.
 //-----------------------------------------------------------------------------
-void WINAPI HandleDragingMode(HWND hWnd, LPARAM lParam, int DragingMode)
+void WINAPI HandleDragingMode(HWND hWnd, int DragingMode, int DX, int DY)
 {
-    int status = 0; // 몇 번째 텍스트를 클릭했는지 판단하기 위함 (0 ~ 2)
-
-    if (DragingMode == VERTEX_NOSELECTED)
-        return;
+    int I;
 
     DrawSizeInfoLine(hWnd);         //기존 그려진 안내선을 지움(잔상처리)
-    if (DragingMode == VERTEX_ADJUSTWIDTH || DragingMode == VERTEX_ADJUSTDIAGONAL)
+
+    switch (DragingMode)
     {
-        g_imgSzX = LoInt16(lParam);
-        //g_imgSzX = (int)((LoInt16(lParam) / 25.4) * 120);
-        //printf("(int)((LoInt16(lParam) / 25.4) * 120): %d\n", (int)((LoInt16(lParam) / 25.4) * 120));
-    }
-        
-    if (DragingMode == VERTEX_ADJUSTHEIGHT || DragingMode == VERTEX_ADJUSTDIAGONAL)
-    {
-        g_imgSzY = HiInt16(lParam);
-        //g_imgSzY = (int)((HiInt16(lParam) / 25.4) * 120);
-        //printf("(int)((HiInt16(lParam) / 25.4) * 120): %d\n", (int)((HiInt16(lParam) / 25.4) * 120));
-    }
-        
-    if (DragingMode == VERTEX_INTEXT_1)
-    {
-        status = 0;
-        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
-        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
-    }
-    else if (DragingMode == VERTEX_INTEXT_2)
-    {
-        status = 1;
-        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
-        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
-    }
-    else if (DragingMode == VERTEX_INTEXT_3)
-    {
-        status = 2;
-        g_textRect[status].left = LOWORD(lParam) - (g_textRect[status].right - g_textRect[status].left) / 2;
-        g_textRect[status].top = HIWORD(lParam) - (g_textRect[status].bottom - g_textRect[status].top) / 2;
+    case VERTEX_ADJUSTWIDTH: g_imgSzX += DX; break;
+    case VERTEX_ADJUSTHEIGHT: g_imgSzY += DY; break;
+    case VERTEX_ADJUSTDIAGONAL: g_imgSzX += DX; g_imgSzY += DY; break;
+    case VERTEX_INTEXT_1: I = 0; goto AdjText;
+    case VERTEX_INTEXT_2: I = 1; goto AdjText;
+    case VERTEX_INTEXT_3: I = 2; //goto AdjText;
+    AdjText:
+        OffsetRect(&g_textRect[I], DX, DY);
     }
 
     DrawSizeInfoLine(hWnd);
@@ -582,27 +529,24 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
     switch (Msg)
     {
     case WM_LBUTTONDOWN:
-        SetCapture(hWnd);
         oldP.x = LoInt16(lPrm);
         oldP.y = HiInt16(lPrm);
 
-        printf("DragingMode  시작\n");
-        if ((DragingMode = GetDragingMode(hWnd, oldP)) == VERTEX_NOSELECTED)
-            break;
+        printf("MousePanning 함수 시작\n");
+        printf("P.x: %d, P.y: %d\n", oldP.x, oldP.y);
+        if ((DragingMode = GetDragingMode(hWnd, oldP)) == VERTEX_NOSELECTED) break;
         printf("DragingMode: %d\n", DragingMode);
-        DrawSizeInfoLine(hWnd);
+        DrawSizeInfoLine(hWnd); // 있으나 없으나..?
 
         //printf("imgX: %d, imgY: %d\n", g_imgSzX, g_imgSzY);
         //printf("W2DX(imgX): %d, W2DY(imgY): %d\n", W2DX(g_imgSzX), W2DY(g_imgSzY));
-        printf("P.x: %d, P.y: %d\n", oldP.x, oldP.y);
+        SetCapture(hWnd);
         break;
 
     case WM_MOUSEMOVE:
         if (GetCapture() == hWnd)
         {
-            HandleDragingMode(hWnd, lPrm, DragingMode);
-            g_panningX -= D2W(LoInt16(lPrm) - oldP.x);
-            g_panningY -= D2W(HiInt16(lPrm) - oldP.y);
+            HandleDragingMode(hWnd, DragingMode, D2W(LoInt16(lPrm) - oldP.x), D2W(HiInt16(lPrm) - oldP.y));
             InvalidateRect(hWnd, NULL, TRUE);
             oldP.x = LoInt16(lPrm);
             oldP.y = HiInt16(lPrm);
@@ -610,6 +554,8 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
         break;
 
     case WM_LBUTTONUP:
+        printf("g_imgSzX=%d\n", g_imgSzX);
+        printf("g_imgSzY=%d\n", g_imgSzY);
         ReleaseCapture();
     }
 }
@@ -619,14 +565,14 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
 //----------------------------------------------------------------------------
 //      파일을 열어 이미지를 선택합니다.
 //----------------------------------------------------------------------------
-BOOL WINAPI OpenImage(HWND hDlg, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR Filter)
+BOOL WINAPI OpenImage(HWND hWnd, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR Filter)
 {
     OPENFILENAME ofn;
     BOOL rv; //return value
 
     ZeroMemory(&ofn, sizeof(OPENFILENAME));
     ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = hDlg;
+    ofn.hwndOwner = hWnd;
     ofn.lpstrTitle = Title;
     ofn.lpstrFilter = Filter;
     ofn.lpstrFile = Buff;
@@ -692,23 +638,66 @@ void WINAPI KeyProc(HWND hWnd, int key)
 
 
 //-----------------------------------------------------------------------------
+//      이미지, 텍스트, 클립아트를 프린트합니다.
+//-----------------------------------------------------------------------------
+void WINAPI Print(HWND hWnd)
+{
+    int X, Y, PrtResX, PrtResY, OrgZoom, OrgPanX, OrgPaxY;
+    HDC hPrnDC = NULL;
+    DOCINFO di = { sizeof(DOCINFO), TEXT("Printing") };
+
+    OrgZoom = g_zoomVal;
+    OrgPanX = g_panningX;
+    OrgPaxY = g_panningY;
+
+    if ((hPrnDC = GetPrinterDC(hWnd)) == NULL) goto ProcExit;
+    StartDoc(hPrnDC, &di);
+
+    PrtResX = GetDeviceCaps(hPrnDC, HORZRES);
+    PrtResY = GetDeviceCaps(hPrnDC, VERTRES);
+
+    g_zoomVal = PrtResX * 1000 / PAPERXSIZE;
+
+    for (Y = 0; Y < PAPERYQTY; Y++)
+    {
+        for (X = 0; X < PAPERXQTY; X++)
+        {
+            StartPage(hPrnDC);
+            g_panningX = X * PAPERXSIZE;
+            g_panningY = Y * PAPERYSIZE;
+            DrawAll(hWnd, hPrnDC);
+            EndPage(hPrnDC);
+        }
+    }
+    EndDoc(hPrnDC);
+
+ProcExit:
+    if (hPrnDC) DeleteDC(hPrnDC);
+    g_zoomVal = OrgZoom;
+    g_panningX = OrgPanX;
+    g_panningY = OrgPaxY;
+}
+
+
+
+//-----------------------------------------------------------------------------
 //      이미지 다이얼로그를 호출합니다
 //-----------------------------------------------------------------------------
-BOOL CALLBACK ImageDialogBoxProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM lParam)
+BOOL CALLBACK ImageDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 {
     switch (iMessage)
     {
     case WM_INITDIALOG:
     {
-        g_hButtonOpenFileDialog = GetDlgItem(hDlg, IDC_OPEN_FILE_BTN);
-        g_hEditFileToBeOpened   = GetDlgItem(hDlg, IDC_IMG_ROUTE_EDIT);
+        g_hButtonOpenFileDialog = GetDlgItem(hWnd, IDC_OPEN_FILE_BTN);
+        g_hEditFileToBeOpened = GetDlgItem(hWnd, IDC_IMG_ROUTE_EDIT);
         return TRUE;
     }
 
     case WM_PAINT:
         PAINTSTRUCT ps;
-        BeginPaint(hDlg, &ps);
-        EndPaint(hDlg, &ps);
+        BeginPaint(hWnd, &ps);
+        EndPaint(hWnd, &ps);
         return TRUE;
 
     case WM_COMMAND:
@@ -716,12 +705,12 @@ BOOL CALLBACK ImageDialogBoxProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM
         switch (wParam)
         {
         case IDOK:
-            GetDlgItemText(hDlg, IDC_IMG_ROUTE_EDIT, g_imgRoute, sizeof(g_imgRoute));  // 마지막 인자에 256대신 sizeof씀
-            EndDialog(hDlg, 0);
+            GetDlgItemText(hWnd, IDC_IMG_ROUTE_EDIT, g_imgRoute, sizeof(g_imgRoute));  // 마지막 인자에 256대신 sizeof씀
+            EndDialog(hWnd, 0);
             return TRUE;
 
         case IDCANCEL:
-            EndDialog(hDlg, 0);
+            EndDialog(hWnd, 0);
             return TRUE;
 
         case IDC_OPEN_FILE_BTN:
@@ -729,7 +718,7 @@ BOOL CALLBACK ImageDialogBoxProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM
             char szFileName[MAX_PATH];
             szFileName[0] = 0;
 
-            if (OpenImage(hDlg, szFileName, sizeof(szFileName), "이미지 파일을 선택하세요", "All Files(*.bmp)\0*.bmp\0") == FALSE) break;
+            if (OpenImage(hWnd, szFileName, sizeof(szFileName), "이미지 파일을 선택하세요", "All Files(*.bmp)\0*.bmp\0") == FALSE) break;
             SetWindowText(g_hEditFileToBeOpened, szFileName);
             return TRUE;
         }
@@ -745,18 +734,18 @@ BOOL CALLBACK ImageDialogBoxProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM
 //-----------------------------------------------------------------------------
 //      텍스트 다이얼로그를 호출합니다
 //-----------------------------------------------------------------------------
-BOOL CALLBACK TextDialogBoxProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM lParam)
+BOOL CALLBACK TextDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 {
     switch (iMessage)
     {
     case WM_INITDIALOG:
-        CreateComboBox(hDlg);
+        CreateComboBox(hWnd);
         return TRUE;
 
     case WM_PAINT:
         PAINTSTRUCT ps;
-        BeginPaint(hDlg, &ps);
-        EndPaint(hDlg, &ps);
+        BeginPaint(hWnd, &ps);
+        EndPaint(hWnd, &ps);
         return TRUE;
 
     case WM_COMMAND:
@@ -764,20 +753,62 @@ BOOL CALLBACK TextDialogBoxProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM 
         switch (wParam)
         {
         case IDCOLOR:
-            ChoiceTextColor(hDlg);
+            ChoiceTextColor(hWnd);
             return 0;
 
         case IDOK:
-            SaveTextInfo(hDlg);
-            EndDialog(hDlg, 0);
+            SaveTextInfo(hWnd);
+            EndDialog(hWnd, IDOK);
             return TRUE;
 
         case IDCANCEL:
-            EndDialog(hDlg, 0);
+            EndDialog(hWnd, IDCANCEL);
             return TRUE;
         }
     }
 
+    }
+    return FALSE;
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      인쇄 다이얼로그를 호출합니다
+//-----------------------------------------------------------------------------
+BOOL CALLBACK PrintDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
+{
+    switch (iMessage)
+    {
+    case WM_INITDIALOG:
+        //ShowWindow(hWnd, SW_SHOWMAXIMIZED); // 다이얼로그 전체화면
+        return TRUE;
+
+    case WM_PAINT:
+        PAINTSTRUCT ps;
+        BeginPaint(hWnd, &ps);
+        //Rectangle(ps.hdc, PREV_LEFT, PREV_TOP, PREV_RIGHT, PREV_BOTTOM); // A4 용지비율 (1 : 1.4)
+        //DrawPreviewImage(hWnd, ps.hdc);
+        //DrawPreviewText(hWnd, ps.hdc);
+        EndPaint(hWnd, &ps);
+        return TRUE;
+
+    case WM_COMMAND:
+    {
+        switch (wParam)
+        {
+        case IDOK:
+            //ReadPrinterInfo(hWnd);
+            if (g_hImageLoaded) Print(hWnd);
+            EndDialog(hWnd, 0);
+            return TRUE;
+
+        case IDCANCEL:
+            //pi.currPage = 1; // 취소를 누르면 현재 페이지 초기화
+            EndDialog(hWnd, 0);
+            return TRUE;
+        }
+    }
     }
     return FALSE;
 }
@@ -806,12 +837,22 @@ void WINAPI ID_AddTextProc(HWND hWnd)
     if (g_textCnt < 3)
     {
         printf("ID_AddTextProc 실행 시작\n");
-        DialogBox(hInst, MAKEINTRESOURCE(IDD_ADD_TEXT_DLG), hWnd, TextDialogBoxProc);
+        if (DialogBox(hInst, MAKEINTRESOURCE(IDD_ADD_TEXT_DLG), hWnd, TextDialogBoxProc) == IDOK) g_textCnt++;
         InvalidateRect(hWnd, NULL, TRUE); // WndProc 내 WM_PAINT 메시지가 다시 발생한다.
         printf("ID_AddTextProc 실행 종료\n");
     }
     else
         MessageBox(hWnd, "텍스는 3개까지 추가가 가능합니다.", "알림", MB_OK);
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      인쇄 메뉴를 클릭했을 때 실행하는 함수
+//-----------------------------------------------------------------------------
+void WINAPI ID_PrintProc(HWND hWnd)
+{
+    DialogBox(hInst, MAKEINTRESOURCE(ID_PRINT_DIALOG), hWnd, PrintDialogBoxProc);
 }
 
 
@@ -828,18 +869,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:         //윈도우가 생성될 때 한번 옴
         lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();  //테스트용임
+        g_hPenPapaer = CreatePen(PS_SOLID, 1, RGB(192, 192, 192));
         return 0;
 
     case WM_DESTROY:        //윈도우가 파기될 때
         if (g_hImageLoaded) DeleteObject(g_hImageLoaded);
+        if (g_hPenPapaer)   DeleteObject(g_hPenPapaer);
         PostQuitMessage(0); //GetMessage()의 리턴을 FALSE로 만들어 종료하게 함
         return 0;
 
     case WM_PAINT:          //화면을 그려야 할 이유가 생겼을 떄
         PAINTSTRUCT PS;
-        //DrawTextAll(hWnd);
         BeginPaint(hWnd, &PS);
         DrawAll(hWnd, PS.hdc);
+        DrawPaper(hWnd, PS.hdc);
         EndPaint(hWnd, &PS);
         return 0;
 
@@ -856,6 +899,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case ID_ADD_TEXT:
             ID_AddTextProc(hWnd); break;
 
+        case ID_PRINT:
+            //ID_PrintProc(hWnd); break;
+            Print(hWnd); break;
+
         case IDM_EXIT:
             DestroyWindow(hWnd); break;
         }
@@ -866,16 +913,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ScreenToClient(hWnd, &P); // 노트북 화면이 기준이 아니라 윈도우 메인 화면을 기준으로 한다.
         switch (GetDragingMode(hWnd, P))
         {
-        case VERTEX_ADJUSTWIDTH:      SetCursor(LoadCursor(NULL, IDC_SIZEWE));		return TRUE;
-        case VERTEX_ADJUSTHEIGHT:     SetCursor(LoadCursor(NULL, IDC_SIZENS));		return TRUE;
-        case VERTEX_ADJUSTDIAGONAL:	  SetCursor(LoadCursor(NULL, IDC_SIZENWSE));	return TRUE;
-        case VERTEX_INTEXT_1:		  SetCursor(LoadCursor(NULL, IDC_HAND));		return TRUE;
-        case VERTEX_INTEXT_2:		  SetCursor(LoadCursor(NULL, IDC_HAND));		return TRUE;
-        case VERTEX_INTEXT_3:		  SetCursor(LoadCursor(NULL, IDC_HAND));		return TRUE;
+        case VERTEX_ADJUSTWIDTH:      SetCursor(LoadCursor(NULL, IDC_SIZEWE));      return TRUE;
+        case VERTEX_ADJUSTHEIGHT:     SetCursor(LoadCursor(NULL, IDC_SIZENS));      return TRUE;
+        case VERTEX_ADJUSTDIAGONAL:   SetCursor(LoadCursor(NULL, IDC_SIZENWSE));    return TRUE;
+        case VERTEX_INTEXT_1:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case VERTEX_INTEXT_2:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case VERTEX_INTEXT_3:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         }
         break;
 
-    case WM_KEYDOWN:   
+    case WM_KEYDOWN:
         KeyProc(hWnd, wParam);
         return 0;
     }
@@ -894,17 +941,17 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_BANNERT3));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_BANNERT3);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_BANNERT3));
+    wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_BANNERT3);
+    wcex.lpszClassName = szWindowClass;
+    wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
     return RegisterClassExW(&wcex);
 }
@@ -916,20 +963,20 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //-----------------------------------------------------------------------------
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
+    hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+    if (!hWnd)
+    {
+        return FALSE;
+    }
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
 
-   return TRUE;
+    return TRUE;
 }
 
 
@@ -937,7 +984,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //-----------------------------------------------------------------------------
 //      WIN32 API 어플리케이션 메인
 //-----------------------------------------------------------------------------
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
@@ -965,7 +1012,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     MSG msg;
 
     // 기본 메시지 루프입니다:
-    while (GetMessage(&msg, nullptr, 0, 0))
+    while (GetMessage(&msg, NULL, 0, 0))
     {
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
         {
