@@ -30,11 +30,6 @@
 #define GRADIENT_HEIGHT 720
 #define CL 5                                                        // 이미지 테두리
 
-#define PREV_LEFT   12
-#define PREV_TOP    50
-#define PREV_RIGHT  533
-#define PREV_BOTTOM 780
-
 //작업 데이터
 #define PAPERXQTY   3
 #define PAPERYQTY   2
@@ -63,15 +58,14 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름�
 static int g_zoomVal = 100;
 static int g_panningX, g_panningY;              // Work영역좌표
 static int g_imgSzX, g_imgSzY;                  // Work영역 상의 이미지 크기
-static int g_textHeight = 300;
 
 static HWND g_hButtonOpenFileDialog;            // 파일열기 대화상자를 실행하기 위한 버튼의 핸들
 static HWND g_hEditFileToBeOpened;              // 파일의 경로와 이름을 가져오는 에디트 컨트롤의 핸들
 static char g_imgRoute[256];                    // 이미지 경로 ex)"C:\project\Banner\banner\girl.bmp"
 
 static int      g_textSz[3];                    // 사용자가 콤보박스에서 선택한 글자 크기(pt)
-static char* g_textFontArr[3];               // 사용자가 선택한 글꼴을 모아놓은 배열
-static char* g_textStrArr[3];                // 사용자가 입력한 텍스트를 모아놓은 배열
+static char* g_textFontArr[3];                  // 사용자가 선택한 글꼴을 모아놓은 배열
+static char* g_textStrArr[3];                   // 사용자가 입력한 텍스트를 모아놓은 배열
 static int      g_textCnt = 0;                  // 텍스트 개수
 static RGBQUAD  g_textColor[3];                 // 사용자가 선택한 글자 색상
 
@@ -83,28 +77,6 @@ static RECT     g_imgRect;                      // 이미지 좌표
 //작업중인 텍스트 관련
 static RECT g_textRect[3];                      // 텍스트 외곽 좌표
 static int  g_prevTextSz;                       // 미리보기에서 텍스트 크기
-
-//프린터 구조체
-struct PRINTERINFO
-{
-    int xRes;                                   // A4 기준 pixel
-    int yRes;
-    int xSize;                                  // A4 기준 mm
-    int ySize;
-    int xDpi;
-    int yDpi;
-
-    int pW;
-    int pH;
-    int pOL;
-    int xResMtp;                                // a4 너비 사이즈 배수
-    int yResMtp;                                // a4 높이 사이즈 배수
-    int ng_ImageWidth;
-    int ng_ImageHeight;
-    int currPage;                           // 현재 페이지
-    int endPage;                                // 마지막 페이지
-};
-PRINTERINFO pi;                                 // Printer Information
 
 //-----------------------------------------------------------------------------
 //      PrinterDC를 호출합니다
@@ -465,7 +437,7 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
     int  i, DragingMode = VERTEX_NOSELECTED;
     HDC  hdc;
     RECT R;
-    static CONST int TextSelMode[] = { VERTEX_INTEXT_1, VERTEX_INTEXT_2, VERTEX_INTEXT_3 };
+    static const int TextSelMode[] = { VERTEX_INTEXT_1, VERTEX_INTEXT_2, VERTEX_INTEXT_3 };
 
     hdc = GetDC(hWnd);
 
@@ -497,20 +469,20 @@ ProcExit:
 //-----------------------------------------------------------------------------
 void WINAPI HandleDragingMode(HWND hWnd, int DragingMode, int DX, int DY)
 {
-    int I;
+    int i;
 
     DrawSizeInfoLine(hWnd);         //기존 그려진 안내선을 지움(잔상처리)
 
     switch (DragingMode)
     {
-    case VERTEX_ADJUSTWIDTH: g_imgSzX += DX; break;
-    case VERTEX_ADJUSTHEIGHT: g_imgSzY += DY; break;
+    case VERTEX_ADJUSTWIDTH:    g_imgSzX += DX; break;
+    case VERTEX_ADJUSTHEIGHT:   g_imgSzY += DY; break;
     case VERTEX_ADJUSTDIAGONAL: g_imgSzX += DX; g_imgSzY += DY; break;
-    case VERTEX_INTEXT_1: I = 0; goto AdjText;
-    case VERTEX_INTEXT_2: I = 1; goto AdjText;
-    case VERTEX_INTEXT_3: I = 2; //goto AdjText;
+    case VERTEX_INTEXT_1: i = 0; goto AdjText;
+    case VERTEX_INTEXT_2: i = 1; goto AdjText;
+    case VERTEX_INTEXT_3: i = 2; //goto AdjText;
     AdjText:
-        OffsetRect(&g_textRect[I], DX, DY);
+        OffsetRect(&g_textRect[i], DX, DY);
     }
 
     DrawSizeInfoLine(hWnd);
@@ -642,21 +614,21 @@ void WINAPI KeyProc(HWND hWnd, int key)
 //-----------------------------------------------------------------------------
 void WINAPI Print(HWND hWnd)
 {
-    int X, Y, PrtResX, PrtResY, OrgZoom, OrgPanX, OrgPaxY;
+    int X, Y, prtResX, prtResY, orgZoom, orgPanX, orgPanY;
     HDC hPrnDC = NULL;
     DOCINFO di = { sizeof(DOCINFO), TEXT("Printing") };
 
-    OrgZoom = g_zoomVal;
-    OrgPanX = g_panningX;
-    OrgPaxY = g_panningY;
+    orgZoom = g_zoomVal;
+    orgPanX = g_panningX;
+    orgPanY = g_panningY;
 
     if ((hPrnDC = GetPrinterDC(hWnd)) == NULL) goto ProcExit;
     StartDoc(hPrnDC, &di);
 
-    PrtResX = GetDeviceCaps(hPrnDC, HORZRES);
-    PrtResY = GetDeviceCaps(hPrnDC, VERTRES);
+    prtResX = GetDeviceCaps(hPrnDC, HORZRES);
+    prtResY = GetDeviceCaps(hPrnDC, VERTRES);
 
-    g_zoomVal = PrtResX * 1000 / PAPERXSIZE;
+    g_zoomVal = prtResX * 1000 / PAPERXSIZE;
 
     for (Y = 0; Y < PAPERYQTY; Y++)
     {
@@ -673,9 +645,9 @@ void WINAPI Print(HWND hWnd)
 
 ProcExit:
     if (hPrnDC) DeleteDC(hPrnDC);
-    g_zoomVal = OrgZoom;
-    g_panningX = OrgPanX;
-    g_panningY = OrgPaxY;
+    g_zoomVal = orgZoom;
+    g_panningX = orgPanX;
+    g_panningY = orgPanY;
 }
 
 
@@ -774,48 +746,6 @@ BOOL CALLBACK TextDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM 
 
 
 //-----------------------------------------------------------------------------
-//      인쇄 다이얼로그를 호출합니다
-//-----------------------------------------------------------------------------
-BOOL CALLBACK PrintDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
-{
-    switch (iMessage)
-    {
-    case WM_INITDIALOG:
-        //ShowWindow(hWnd, SW_SHOWMAXIMIZED); // 다이얼로그 전체화면
-        return TRUE;
-
-    case WM_PAINT:
-        PAINTSTRUCT ps;
-        BeginPaint(hWnd, &ps);
-        //Rectangle(ps.hdc, PREV_LEFT, PREV_TOP, PREV_RIGHT, PREV_BOTTOM); // A4 용지비율 (1 : 1.4)
-        //DrawPreviewImage(hWnd, ps.hdc);
-        //DrawPreviewText(hWnd, ps.hdc);
-        EndPaint(hWnd, &ps);
-        return TRUE;
-
-    case WM_COMMAND:
-    {
-        switch (wParam)
-        {
-        case IDOK:
-            //ReadPrinterInfo(hWnd);
-            if (g_hImageLoaded) Print(hWnd);
-            EndDialog(hWnd, 0);
-            return TRUE;
-
-        case IDCANCEL:
-            //pi.currPage = 1; // 취소를 누르면 현재 페이지 초기화
-            EndDialog(hWnd, 0);
-            return TRUE;
-        }
-    }
-    }
-    return FALSE;
-}
-
-
-
-//-----------------------------------------------------------------------------
 //      '이미지 선택' 메뉴를 클릭했을 때 실행하는 함수
 //-----------------------------------------------------------------------------
 void WINAPI OpenImgProc(HWND hWnd)
@@ -843,16 +773,6 @@ void WINAPI ID_AddTextProc(HWND hWnd)
     }
     else
         MessageBox(hWnd, "텍스는 3개까지 추가가 가능합니다.", "알림", MB_OK);
-}
-
-
-
-//-----------------------------------------------------------------------------
-//      인쇄 메뉴를 클릭했을 때 실행하는 함수
-//-----------------------------------------------------------------------------
-void WINAPI ID_PrintProc(HWND hWnd)
-{
-    DialogBox(hInst, MAKEINTRESOURCE(ID_PRINT_DIALOG), hWnd, PrintDialogBoxProc);
 }
 
 
@@ -900,7 +820,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             ID_AddTextProc(hWnd); break;
 
         case ID_PRINT:
-            //ID_PrintProc(hWnd); break;
             Print(hWnd); break;
 
         case IDM_EXIT:
