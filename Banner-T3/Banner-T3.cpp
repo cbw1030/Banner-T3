@@ -25,14 +25,11 @@
 #define VERTEX_ADJUSTDIAGONAL   2
 #define VERTEX_IMAGE_LENGTH     3
 
-#define STD_POINT       30
-#define GRADIENT_WIDTH  1440
-#define GRADIENT_HEIGHT 720
 #define CL 5                                                        // 이미지 테두리
 
 //작업 데이터
-#define PAPERXQTY   3
-#define PAPERYQTY   2
+//#define PAPERXQTY   3
+//#define PAPERYQTY   2
 
 #define PAPERXSIZE  2100                                            // A4 가로 mm
 #define PAPERYSIZE  2970                                            // A4 세로 mm
@@ -64,8 +61,8 @@ static HWND g_hEditFileToBeOpened;              // 파일의 경로와 이름을
 static char g_imgRoute[256];                    // 이미지 경로 ex)"C:\project\Banner\banner\girl.bmp"
 
 static int      g_textSz[3];                    // 사용자가 콤보박스에서 선택한 글자 크기(pt)
-static char* g_textFontArr[3];                  // 사용자가 선택한 글꼴을 모아놓은 배열
-static char* g_textStrArr[3];                   // 사용자가 입력한 텍스트를 모아놓은 배열
+static char*    g_textFontArr[3];               // 사용자가 선택한 글꼴을 모아놓은 배열
+static char*    g_textStrArr[3];                // 사용자가 입력한 텍스트를 모아놓은 배열
 static int      g_textCnt = 0;                  // 텍스트 개수
 static RGBQUAD  g_textColor[3];                 // 사용자가 선택한 글자 색상
 
@@ -77,6 +74,10 @@ static RECT     g_imgRect;                      // 이미지 좌표
 //작업중인 텍스트 관련
 static RECT g_textRect[3];                      // 텍스트 외곽 좌표
 static int  g_prevTextSz;                       // 미리보기에서 텍스트 크기
+
+//작업중인 A4 관련
+static int PAPERXQTY;
+static int PAPERYQTY;
 
 //-----------------------------------------------------------------------------
 //      PrinterDC를 호출합니다
@@ -149,14 +150,11 @@ void WINAPI DrawImgBoundaryLine(HDC hdc)
 void WINAPI LoadBmpImage(void)
 {
     BITMAP bm;
-    //int tx, ty;       // 원본 이미지(px)를 mm로 변환한 값을 잠시 넣어놓음
 
     if ((g_hImageLoaded = (HBITMAP)LoadImage(NULL, g_imgRoute, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION)) != NULL)
     {
         GetObject(g_hImageLoaded, sizeof(BITMAP), &bm);
 
-        //tx = (int)((bm.bmWidth / 25.4) * 120);       // 120은 이미지의 dpi를 의미한다(일단 정적으로 해놓음)
-        //ty = (int)((bm.bmHeight / 25.4) * 120);
         g_imgSzX = (int)((bm.bmWidth / 25.4) * 120);       // 120은 이미지의 dpi를 의미한다(일단 정적으로 해놓음)
         g_imgSzY = (int)((bm.bmHeight / 25.4) * 120);
     }
@@ -298,13 +296,8 @@ void WINAPI ChoiceTextColor(HWND hWnd)
     {
         textColor = col.rgbResult;
         g_textColor[g_textCnt] = colorConverter(textColor);
-        //printf("Color: %lu\n", textColor); // 사용자가 선택한 색상 십진법으로 출력
-        //printf("RGB(%u, %u, %u)\n", g_textColor.rgbRed, g_textColor.rgbGreen, g_textColor.rgbBlue);
     }
 }
-
-
-
 
 
 
@@ -385,7 +378,6 @@ void WINAPI DrawPaper(HWND hWnd, HDC hDC)
         }
     }
 }
-
 
 
 
@@ -560,6 +552,24 @@ BOOL WINAPI OpenImage(HWND hWnd, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR 
 
 
 //-----------------------------------------------------------------------------
+//      사용자로부터 입력받은 A4 용지 가로/세로 장 수를 처리합니다.
+//-----------------------------------------------------------------------------
+void WINAPI SaveA4Info(HWND hWnd)
+{
+    if (GetDlgItemInt(hWnd, IDC_A4_WIDTH_EDIT, NULL, FALSE) == 0 || GetDlgItemInt(hWnd, IDC_A4_HEIGHT_EDIT, NULL, FALSE) == 0)
+    {
+        MessageBox(hWnd, "공백을 입력해 주세요.", "알림", MB_OK);
+    }
+    else
+    {
+        PAPERXQTY = GetDlgItemInt(hWnd, IDC_A4_WIDTH_EDIT, NULL, FALSE);
+        PAPERYQTY = GetDlgItemInt(hWnd, IDC_A4_HEIGHT_EDIT, NULL, FALSE);
+    }
+}
+
+
+
+//-----------------------------------------------------------------------------
 //      메인 윈도우 메세지 처리
 //-----------------------------------------------------------------------------
 void WINAPI KeyProc(HWND hWnd, int key)
@@ -569,22 +579,6 @@ void WINAPI KeyProc(HWND hWnd, int key)
 
     switch (key)
     {
-    case 'I':   //확대
-        if (currZoom > 0)
-        {
-            g_zoomVal = zoomTable[--currZoom];
-            InvalidateRect(hWnd, NULL, TRUE);
-        }
-        break;
-
-    case 'O':   //축소
-        if (currZoom < countof(zoomTable) - 1)
-        {
-            g_zoomVal = zoomTable[++currZoom];
-            InvalidateRect(hWnd, NULL, TRUE);
-        }
-        break;
-
     case VK_LEFT:
         g_panningX += 100;
         InvalidateRect(hWnd, NULL, TRUE);
@@ -649,7 +643,38 @@ ProcExit:
     g_panningX = orgPanX;
     g_panningY = orgPanY;
 }
+//-----------------------------------------------------------------------------
+//      A4 용지 셋팅 다이얼로그를 호출합니다
+//-----------------------------------------------------------------------------
+BOOL CALLBACK A4DialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
+{
+    switch (iMessage)
+    {
 
+    case WM_PAINT:
+        PAINTSTRUCT ps;
+        BeginPaint(hWnd, &ps);
+        EndPaint(hWnd, &ps);
+        return TRUE;
+
+    case WM_COMMAND:
+    {
+        switch (wParam)
+        {
+        case IDOK:
+            SaveA4Info(hWnd);
+            EndDialog(hWnd, 0);
+            return TRUE;
+
+        case IDCANCEL:
+            EndDialog(hWnd, 0);
+            return TRUE;
+        }
+    }
+
+    }
+    return FALSE;
+}
 
 
 //-----------------------------------------------------------------------------
@@ -762,14 +787,14 @@ void WINAPI OpenImgProc(HWND hWnd)
 //-----------------------------------------------------------------------------
 //      '텍스트 추가 및 수정' 메뉴를 클릭했을 때 실행하는 함수
 //-----------------------------------------------------------------------------
-void WINAPI ID_AddTextProc(HWND hWnd)
+void WINAPI AddTextProc(HWND hWnd)
 {
     if (g_textCnt < 3)
     {
-        printf("ID_AddTextProc 실행 시작\n");
+        printf("AddTextProc 실행 시작\n");
         if (DialogBox(hInst, MAKEINTRESOURCE(IDD_ADD_TEXT_DLG), hWnd, TextDialogBoxProc) == IDOK) g_textCnt++;
         InvalidateRect(hWnd, NULL, TRUE); // WndProc 내 WM_PAINT 메시지가 다시 발생한다.
-        printf("ID_AddTextProc 실행 종료\n");
+        printf("AddTextProc 실행 종료\n");
     }
     else
         MessageBox(hWnd, "텍스는 3개까지 추가가 가능합니다.", "알림", MB_OK);
@@ -784,11 +809,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     MousePanning(hWnd, message, wParam, lParam);
     POINT P;
+    static int currZoom = 4;
+    static const int zoomTable[] = { 2000, 1000, 500, 250, 125, 63 };
 
     switch (message)
     {
     case WM_CREATE:         //윈도우가 생성될 때 한번 옴
-        lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();  //테스트용임
+        DialogBox(hInst, MAKEINTRESOURCE(IDD_INIT_DLG), hWnd, A4DialogBoxProc); // 사용자로부터 A4 장 수 입력 받음
+        lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();                        //테스트용임
         g_hPenPapaer = CreatePen(PS_SOLID, 1, RGB(192, 192, 192));
         return 0;
 
@@ -817,7 +845,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             OpenImgProc(hWnd); break;
 
         case ID_ADD_TEXT:
-            ID_AddTextProc(hWnd); break;
+            AddTextProc(hWnd); break;
 
         case ID_PRINT:
             Print(hWnd); break;
@@ -826,7 +854,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             DestroyWindow(hWnd); break;
         }
         return 0;
-
+  
     case WM_SETCURSOR:
         GetCursorPos(&P);
         ScreenToClient(hWnd, &P); // 노트북 화면이 기준이 아니라 윈도우 메인 화면을 기준으로 한다.
@@ -838,6 +866,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case VERTEX_INTEXT_1:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         case VERTEX_INTEXT_2:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         case VERTEX_INTEXT_3:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        }
+        break;
+
+    case WM_MOUSEWHEEL: 
+        if ((SHORT)HIWORD(wParam) > 0)                                             //마우스휠을 올릴 경우 '확대'
+        {
+            if (currZoom > 0)
+            {
+                g_zoomVal = zoomTable[--currZoom];
+                InvalidateRect(hWnd, NULL, TRUE);
+            }
+        }
+        else                                                                    //마우스휠을 내릴 경우 '축소'
+        {
+            if (currZoom < countof(zoomTable) - 1)
+            {
+                g_zoomVal = zoomTable[++currZoom];
+                InvalidateRect(hWnd, NULL, TRUE);
+            }
         }
         break;
 
