@@ -489,6 +489,8 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
 {
     static int DragingMode = VERTEX_NOSELECTED;
     static POINT oldP;
+    static int currZoom = 4;
+    static const int zoomTable[] = { 2000, 1000, 500, 250, 125, 63 };
 
     switch (Msg)
     {
@@ -500,10 +502,8 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
         printf("P.x: %d, P.y: %d\n", oldP.x, oldP.y);
         if ((DragingMode = GetDragingMode(hWnd, oldP)) == VERTEX_NOSELECTED) break;
         printf("DragingMode: %d\n", DragingMode);
-        DrawSizeInfoLine(hWnd); // 있으나 없으나..?
+        DrawSizeInfoLine(hWnd); 
 
-        //printf("imgX: %d, imgY: %d\n", g_imgSzX, g_imgSzY);
-        //printf("W2DX(imgX): %d, W2DY(imgY): %d\n", W2DX(g_imgSzX), W2DY(g_imgSzY));
         SetCapture(hWnd);
         break;
 
@@ -521,6 +521,25 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
         printf("g_imgSzX=%d\n", g_imgSzX);
         printf("g_imgSzY=%d\n", g_imgSzY);
         ReleaseCapture();
+
+    case WM_MOUSEWHEEL:
+        if ((SHORT)HIWORD(wPrm) > 0)                                             //마우스휠을 올릴 경우 '확대'
+        {
+            if (currZoom > 0)
+            {
+                g_zoomVal = zoomTable[--currZoom];
+                InvalidateRect(hWnd, NULL, TRUE);
+            }
+        }
+        else                                                                    //마우스휠을 내릴 경우 '축소'
+        {
+            if (currZoom < countof(zoomTable) - 1)
+            {
+                g_zoomVal = zoomTable[++currZoom];
+                InvalidateRect(hWnd, NULL, TRUE);
+            }
+        }
+        break;
     }
 }
 
@@ -809,8 +828,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     MousePanning(hWnd, message, wParam, lParam);
     POINT P;
-    static int currZoom = 4;
-    static const int zoomTable[] = { 2000, 1000, 500, 250, 125, 63 };
 
     switch (message)
     {
@@ -866,25 +883,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case VERTEX_INTEXT_1:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         case VERTEX_INTEXT_2:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         case VERTEX_INTEXT_3:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
-        }
-        break;
-
-    case WM_MOUSEWHEEL: 
-        if ((SHORT)HIWORD(wParam) > 0)                                             //마우스휠을 올릴 경우 '확대'
-        {
-            if (currZoom > 0)
-            {
-                g_zoomVal = zoomTable[--currZoom];
-                InvalidateRect(hWnd, NULL, TRUE);
-            }
-        }
-        else                                                                    //마우스휠을 내릴 경우 '축소'
-        {
-            if (currZoom < countof(zoomTable) - 1)
-            {
-                g_zoomVal = zoomTable[++currZoom];
-                InvalidateRect(hWnd, NULL, TRUE);
-            }
         }
         break;
 
