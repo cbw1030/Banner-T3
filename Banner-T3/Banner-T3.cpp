@@ -4,14 +4,13 @@
 #include <math.h>
 #include "resource.h"
 #include <stdio.h>
-//#include "openFileDialog-RC.h"
 #include <string.h>
 #include "Banner-T3.h"
 
 //-------------------------------------------------------------------------------------------------
 // Macro Definitions
 #define MAX_LOADSTRING 100
-#define RADIUS 5
+#define RADIUS 5                               // 이미지 꼭짓점 반지름
 
 #define countof(strucName) (sizeof(strucName) / sizeof(strucName[0]))
 
@@ -25,16 +24,12 @@
 #define VERTEX_ADJUSTDIAGONAL   2
 #define VERTEX_IMAGE_LENGTH     3
 
-#define CL 5                                                        // 이미지 테두리
-
-//작업 데이터
-//#define PAPERXQTY   3
-//#define PAPERYQTY   2
-
-#define PAPERXSIZE  2100                                            // A4 가로 mm
-#define PAPERYSIZE  2970                                            // A4 세로 mm
-
+#define PAPERXSIZE  2100                        // A4 가로 mm
+#define PAPERYSIZE  2970                        // A4 세로 mm
+#define CL 5                                    // 이미지 테두리
 #define ZOOMBASE    1000
+#define MAX_TEXT    10                          // 추가할 수 있는 텍스트 최대 개수
+#define MAX_IMAGE   10                          // 추가할 수 있는 이미지 최대 개수
 
 typedef const unsigned char* LPCBYTE;
 typedef const int* LPCINT;
@@ -70,14 +65,16 @@ static RGBQUAD  g_textColor[3];                 // 사용자가 선택한 글자
 static HPEN     g_hPenPapaer;
 static HBITMAP  g_hImageLoaded;                 // 로딩된 HBITMAP
 static RECT     g_imgRect;                      // 이미지 좌표
+static RECT     g_imgRectArr[MAX_IMAGE];
+static BITMAP   g_bmArr[MAX_IMAGE];
 
 //작업중인 텍스트 관련
 static RECT g_textRect[3];                      // 텍스트 외곽 좌표
 static int  g_prevTextSz;                       // 미리보기에서 텍스트 크기
 
 //작업중인 A4 관련
-static int PAPERXQTY;
-static int PAPERYQTY;
+static int PAPERXQTY;                           // 사용자가 입력할 A4용지 가로 장 수
+static int PAPERYQTY;                           // 사용자가 입력할 A4용지 세로 장 수
 
 //-----------------------------------------------------------------------------
 //      PrinterDC를 호출합니다
@@ -490,7 +487,7 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
     static int DragingMode = VERTEX_NOSELECTED;
     static POINT oldP;
     static int currZoom = 4;
-    static const int zoomTable[] = { 2000, 1000, 500, 250, 125, 63 };
+    static const int zoomTable[] = { 2000, 1000, 500, 250, 125, 63, 31, 15 };
 
     switch (Msg)
     {
@@ -498,10 +495,7 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
         oldP.x = LoInt16(lPrm);
         oldP.y = HiInt16(lPrm);
 
-        printf("MousePanning 함수 시작\n");
-        printf("P.x: %d, P.y: %d\n", oldP.x, oldP.y);
         if ((DragingMode = GetDragingMode(hWnd, oldP)) == VERTEX_NOSELECTED) break;
-        printf("DragingMode: %d\n", DragingMode);
         DrawSizeInfoLine(hWnd); 
 
         SetCapture(hWnd);
@@ -518,9 +512,8 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
         break;
 
     case WM_LBUTTONUP:
-        printf("g_imgSzX=%d\n", g_imgSzX);
-        printf("g_imgSzY=%d\n", g_imgSzY);
         ReleaseCapture();
+        break;
 
     case WM_MOUSEWHEEL:
         if ((SHORT)HIWORD(wPrm) > 0)                                             //마우스휠을 올릴 경우 '확대'
@@ -849,10 +842,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         DrawAll(hWnd, PS.hdc);
         DrawPaper(hWnd, PS.hdc);
         EndPaint(hWnd, &PS);
-        return 0;
-
-    case WM_SIZE:           //윈도우 크기의 변화가 생겼을 때
-                            //LOWORD(lPrm): Client Width, HIWORD(lPrm): Client Height
         return 0;
 
     case WM_COMMAND:        //메뉴를 클릭했을 때
