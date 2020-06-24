@@ -820,9 +820,9 @@ BOOL CALLBACK TextDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM 
 
 
 //-----------------------------------------------------------------------------
-//      '이미지 선택' 메뉴를 클릭했을 때 실행하는 함수
+//      '이미지 추가' 메뉴를 클릭했을 때 실행하는 함수
 //-----------------------------------------------------------------------------
-void WINAPI OpenImgProc(HWND hWnd)
+void WINAPI AddImgProc(HWND hWnd)
 {
     DialogBox(hInst, MAKEINTRESOURCE(IDD_ADD_IMG_DLG), hWnd, ImageDialogBoxProc);
 
@@ -835,7 +835,7 @@ void WINAPI OpenImgProc(HWND hWnd)
 
 
 //-----------------------------------------------------------------------------
-//      '텍스트 추가 및 수정' 메뉴를 클릭했을 때 실행하는 함수
+//      '텍스트 추가' 메뉴를 클릭했을 때 실행하는 함수
 //-----------------------------------------------------------------------------
 void WINAPI AddTextProc(HWND hWnd)
 {
@@ -848,6 +848,16 @@ void WINAPI AddTextProc(HWND hWnd)
     }
     else
         MessageBox(hWnd, "텍스는 3개까지 추가가 가능합니다.", "알림", MB_OK);
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      '클립아트 추가' 메뉴를 클릭했을 때 실행하는 함수
+//-----------------------------------------------------------------------------
+void WINAPI AddClipArtProc(HWND hWnd)
+{
+    
 }
 
 
@@ -886,10 +896,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         switch (LOWORD(wParam))
         {
         case ID_ADD_IMG:
-            OpenImgProc(hWnd); break;
+            AddImgProc(hWnd); break;
 
         case ID_ADD_TEXT:
             AddTextProc(hWnd); break;
+
+        case ID_ADD_CLIPART:
+            AddClipArtProc(hWnd); break;
 
         case ID_PRINT:
             Print(hWnd); break;
