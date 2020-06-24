@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "Banner-T3.h"
+#include "d2d1.h"
 
 //-------------------------------------------------------------------------------------------------
 // Macro Definitions
@@ -65,8 +66,11 @@ static RGBQUAD  g_textColor[3];                 // 사용자가 선택한 글자
 static HPEN     g_hPenPapaer;
 static HBITMAP  g_hImageLoaded;                 // 로딩된 HBITMAP
 static RECT     g_imgRect;                      // 이미지 좌표
-static RECT     g_imgRectArr[MAX_IMAGE];
-static BITMAP   g_bmArr[MAX_IMAGE];
+
+//static RECT     g_imgRectArr[MAX_IMAGE];
+//static BITMAP   g_bmArr[MAX_IMAGE];
+//static HBITMAP  g_hImageLoadedArr[MAX_IMAGE];
+//static int      g_imgCnt = 0;
 
 //작업중인 텍스트 관련
 static RECT g_textRect[3];                      // 텍스트 외곽 좌표
@@ -148,13 +152,28 @@ void WINAPI LoadBmpImage(void)
 {
     BITMAP bm;
 
-    if ((g_hImageLoaded = (HBITMAP)LoadImage(NULL, g_imgRoute, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION)) != NULL)
+    if ((g_hImageLoaded =  (HBITMAP)LoadImage(NULL, g_imgRoute, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION)) != NULL)
     {
         GetObject(g_hImageLoaded, sizeof(BITMAP), &bm);
 
-        g_imgSzX = (int)((bm.bmWidth / 25.4) * 120);       // 120은 이미지의 dpi를 의미한다(일단 정적으로 해놓음)
-        g_imgSzY = (int)((bm.bmHeight / 25.4) * 120);
+        // GetSystemMetrics();
+        g_imgSzX = (int)((bm.bmWidth / 25.4) * 280);      
+        g_imgSzY = (int)((bm.bmHeight / 25.4) * 280);
     }
+
+    // 이미지 여러 개 추가하는 소스코드
+    /*
+    BITMAP bm;
+
+    if ((g_hImageLoadedArr[g_imgCnt] =
+        (HBITMAP)LoadImage(NULL, g_imgRoute, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION)) != NULL)
+    {
+        GetObject(g_hImageLoadedArr[g_imgCnt], sizeof(BITMAP), &g_bmArr[g_imgCnt]);
+
+        g_imgSzX = (int)((g_bmArr[g_imgCnt].bmWidth / 25.4) * 120);       // 120은 이미지의 dpi를 의미한다(일단 정적으로 해놓음)
+        g_imgSzY = (int)((g_bmArr[g_imgCnt].bmHeight / 25.4) * 120);
+    }
+    */
 }
 
 
@@ -175,6 +194,20 @@ void WINAPI DrawStretchBitmap(HDC hDC, HBITMAP hBtm, int X1, int Y1, int X2, int
     StretchBlt(hDC, X1, Y1, X2 - X1, Y2 - Y1, hMemDC, 0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY);
     SelectObject(hMemDC, hBtmOld);                                                          // hImage 선택을 해제하기 위해 hBtmOld을 선택한다
     DeleteDC(hMemDC);
+
+    // 이미지 여러 개 추가하는 소스코드
+    /*
+    HDC     hMemDCArr[MAX_IMAGE];
+    HBITMAP hBtmOldArr[MAX_IMAGE];
+
+    GetObject(hBtm, sizeof(BITMAP), &g_bmArr[g_imgCnt]);
+
+    hMemDCArr[g_imgCnt] = CreateCompatibleDC(hDC);
+    hBtmOldArr[g_imgCnt] = (HBITMAP)SelectObject(hMemDCArr[g_imgCnt], hBtm);                                          // hBtm가 선택되기 전의 핸들을 저장해 둔다
+    StretchBlt(hDC, X1, Y1, X2 - X1, Y2 - Y1, hMemDCArr[g_imgCnt], 0, 0, g_bmArr[g_imgCnt].bmWidth, g_bmArr[g_imgCnt].bmHeight, SRCCOPY);
+    SelectObject(hMemDCArr[g_imgCnt], hBtmOldArr[g_imgCnt]);                                                          // hImage 선택을 해제하기 위해 hBtmOld을 선택한다
+    DeleteDC(hMemDCArr[g_imgCnt]);
+    */
 }
 
 
@@ -356,7 +389,7 @@ void WINAPI DrawTextAll(HWND hWnd, HDC hDC)
 
 
 //-----------------------------------------------------------------------------
-//      모든 화면 그리는 동작
+//      A4 미리보기 선을 그리는 함수
 //-----------------------------------------------------------------------------
 void WINAPI DrawPaper(HWND hWnd, HDC hDC)
 {
@@ -385,6 +418,9 @@ void WINAPI DrawAll(HWND hWnd, HDC hDC)
 {
     DrawStretchBitmap(hDC, g_hImageLoaded, W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));
     DrawTextAll(hWnd, hDC);
+
+    // 이미지 여러 개
+    //DrawStretchBitmap(hDC, g_hImageLoadedArr[g_imgCnt], W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));
 }
 
 
@@ -689,6 +725,7 @@ BOOL CALLBACK A4DialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lP
 }
 
 
+
 //-----------------------------------------------------------------------------
 //      이미지 다이얼로그를 호출합니다
 //-----------------------------------------------------------------------------
@@ -714,7 +751,7 @@ BOOL CALLBACK ImageDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM
         switch (wParam)
         {
         case IDOK:
-            GetDlgItemText(hWnd, IDC_IMG_ROUTE_EDIT, g_imgRoute, sizeof(g_imgRoute));  // 마지막 인자에 256대신 sizeof씀
+            GetDlgItemText(hWnd, IDC_IMG_ROUTE_EDIT, g_imgRoute, sizeof(g_imgRoute));
             EndDialog(hWnd, 0);
             return TRUE;
 
@@ -790,6 +827,7 @@ void WINAPI OpenImgProc(HWND hWnd)
     DialogBox(hInst, MAKEINTRESOURCE(IDD_ADD_IMG_DLG), hWnd, ImageDialogBoxProc);
 
     if (g_hImageLoaded) DeleteObject(g_hImageLoaded);
+    //if (g_hImageLoadedArr[g_imgCnt]) DeleteObject(g_hImageLoadedArr[g_imgCnt]);
     LoadBmpImage();
     InvalidateRect(hWnd, NULL, TRUE); // 무효화를 해야 WM_PAINT 메시지가 다시 발생한다.
 }
@@ -827,7 +865,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_CREATE:         //윈도우가 생성될 때 한번 옴
         DialogBox(hInst, MAKEINTRESOURCE(IDD_INIT_DLG), hWnd, A4DialogBoxProc); // 사용자로부터 A4 장 수 입력 받음
         lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();                        //테스트용임
-        g_hPenPapaer = CreatePen(PS_SOLID, 1, RGB(192, 192, 192));
+        g_hPenPapaer = CreatePen(PS_SOLID, 1, RGB(109, 202, 185));
         return 0;
 
     case WM_DESTROY:        //윈도우가 파기될 때
@@ -863,7 +901,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   
     case WM_SETCURSOR:
         GetCursorPos(&P);
-        ScreenToClient(hWnd, &P); // 노트북 화면이 기준이 아니라 윈도우 메인 화면을 기준으로 한다.
+        ScreenToClient(hWnd, &P); // 노트북 화면이 기준이 아니라 윈도우 메인 화면을 기준으로 함
         switch (GetDragingMode(hWnd, P))
         {
         case VERTEX_ADJUSTWIDTH:      SetCursor(LoadCursor(NULL, IDC_SIZEWE));      return TRUE;
@@ -901,7 +939,8 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hInstance = hInstance;
     wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_BANNERT3));
     wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    //wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.hbrBackground = (HBRUSH)CreateSolidBrush(RGB(236, 244, 243));
     wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_BANNERT3);
     wcex.lpszClassName = szWindowClass;
     wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
