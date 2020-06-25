@@ -72,6 +72,9 @@ static RECT     g_imgRect;                      // 이미지 좌표
 //static HBITMAP  g_hImageLoadedArr[MAX_IMAGE];
 //static int      g_imgCnt = 0;
 
+// 작업중인 클립아트 관련;
+static HENHMETAFILE g_hEnh;
+
 //작업중인 텍스트 관련
 static RECT g_textRect[3];                      // 텍스트 외곽 좌표
 static int  g_prevTextSz;                       // 미리보기에서 텍스트 크기
@@ -96,6 +99,131 @@ HDC WINAPI GetPrinterDC(HWND Hwnd)
     // Retrieves the printer DC
     Rslt = PrintDlg(&pd);
     return Rslt ? pd.hDC : NULL;
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      16비트 메타 파일을 32비트 메타 파일로 변환하여 메타 파일 핸들을 리턴한다. 
+//      에러 발생시 NULL을 리턴한다.
+//-----------------------------------------------------------------------------
+HENHMETAFILE ConvertWinToEnh(LPTSTR wmf)
+{
+    //HENHMETAFILE hEnh;
+    HMETAFILE wfile;
+    DWORD dwSize;
+    LPBYTE pBits;
+    METAFILEPICT mp;
+    HDC hdc;
+
+    // 16비트 메타 파일을 읽고 메타 파일 크기만큼 메모리를 할당한다.
+    wfile = GetMetaFile(wmf);
+    if (wmf == NULL)
+        return NULL;
+    dwSize = GetMetaFileBitsEx(wfile, 0, NULL);
+    if (dwSize == 0) {
+        DeleteMetaFile(wfile);
+        return NULL;
+    }
+    pBits = (LPBYTE)malloc(dwSize);
+
+    // 메타 파일의 내용을 버퍼로 읽어들인다.
+    GetMetaFileBitsEx(wfile, dwSize, pBits);
+    mp.mm = MM_ANISOTROPIC;
+    mp.xExt = 1000;
+    mp.yExt = 1000;
+    mp.hMF = NULL;
+
+    // 32비트 메타 파일을 만든다.
+    hdc = GetDC(NULL);
+    g_hEnh = SetWinMetaFileBits(dwSize, pBits, hdc, &mp);
+    ReleaseDC(NULL, hdc);
+    DeleteMetaFile(wfile);
+    free(pBits);
+    return g_hEnh;
+}
+
+
+
+#pragma pack(push)
+#pragma pack(2)
+typedef struct
+{
+    DWORD		dwKey;
+    WORD		hmf;
+    SMALL_RECT	bbox;
+    WORD		wInch;
+    DWORD		dwReserved;
+    WORD		wCheckSum;
+} APMHEADER, * PAPMHEADER;
+#pragma pack(pop)
+//-----------------------------------------------------------------------------
+//      플레이스블 메타 파일을 32비트 메타 파일로 변경해 준다. 
+//      에러 발생시 NULL을 리턴한다.
+//-----------------------------------------------------------------------------
+HENHMETAFILE ConvertPlaToEnh(LPTSTR szFileName)
+{
+    //HENHMETAFILE	hEnh;
+    DWORD			dwSize;
+    LPBYTE			pBits;
+    METAFILEPICT	mp;
+    HDC				hdc;
+    HANDLE			hFile;
+
+    // 32비트 메타 파일이 아니면 플레이스블 메타 파일로 읽는다.
+    // 파일 크기만큼 메모리를 할당하고 메타 파일을 읽어들인다.
+    hFile = CreateFile(szFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return NULL;
+    dwSize = GetFileSize(hFile, NULL);
+    pBits = (LPBYTE)malloc(dwSize);
+    ReadFile(hFile, pBits, dwSize, &dwSize, NULL);
+    CloseHandle(hFile);
+    // 플레이스블 메타 파일이 맞는지 확인한다.
+    if (((PAPMHEADER)pBits)->dwKey != 0x9ac6cdd7l) {
+        free(pBits);
+        return NULL;
+    }
+
+    // 구조체를 채운다.
+    mp.mm = MM_ANISOTROPIC;
+    mp.xExt = ((PAPMHEADER)pBits)->bbox.Right - ((PAPMHEADER)pBits)->bbox.Left;
+    mp.xExt = (mp.xExt * 2540l) / (DWORD)(((PAPMHEADER)pBits)->wInch);
+    mp.yExt = ((PAPMHEADER)pBits)->bbox.Bottom - ((PAPMHEADER)pBits)->bbox.Top;
+    mp.yExt = (mp.yExt * 2540l) / (DWORD)(((PAPMHEADER)pBits)->wInch);
+    mp.hMF = NULL;
+    // 메타 파일을 만든다.
+    hdc = GetDC(NULL);
+    g_hEnh = SetWinMetaFileBits(dwSize, &(pBits[sizeof(APMHEADER)]), hdc, &mp);
+    ReleaseDC(NULL, hdc);
+    free(pBits);
+    return g_hEnh;
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      32비트 메타 파일의 핸들을 리턴한다. 16비트 메타 파일이나 플레이스블 메타 파일
+//      일 경우 32비트 메타 파일로 변환해준다.
+//-----------------------------------------------------------------------------
+HENHMETAFILE ReadMeta(LPTSTR FileName)
+{
+    //HENHMETAFILE hEnh;
+    // 32비트 메타 파일의 핸들을 구해 리턴한다.
+    g_hEnh = GetEnhMetaFile(FileName);
+    if (g_hEnh != NULL)
+        return g_hEnh;
+    // 32비트 메타 파일이 아닐 경우 16비트 포멧으로 읽어보고 32비트 전환한다.
+    g_hEnh = ConvertWinToEnh(FileName);
+    if (g_hEnh != NULL)
+        return g_hEnh;
+    // 16비트 메타 파일도 아닐 경우 플레이스블 메타 파일을 32비트로 전환한다.
+    g_hEnh = ConvertPlaToEnh(FileName);
+    if (g_hEnh != NULL)
+        return g_hEnh;
+    // 세 경우 다 해당하지 않을 경우 NULL을 리턴한다.
+    return NULL;
 }
 
 
@@ -362,6 +490,22 @@ void WINAPI CreateComboBox(HWND hWnd)
 //-----------------------------------------------------------------------------
 //      윈도우 영역에서 글꼴, 색상, 크기는 여기서 모두 작업합니다
 //-----------------------------------------------------------------------------
+void WINAPI DrawClipArt(HWND hWnd, HDC hDC)
+{
+    //HENHMETAFILE hEnh;
+    RECT rt;
+
+    if (g_hEnh) {
+        GetClientRect(hWnd, &rt);
+        PlayEnhMetaFile(hDC, g_hEnh, &rt);
+    }
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      윈도우 영역에서 글꼴, 색상, 크기는 여기서 모두 작업합니다
+//-----------------------------------------------------------------------------
 void WINAPI DrawTextAll(HWND hWnd, HDC hDC)
 {
     int   i;
@@ -417,6 +561,7 @@ void WINAPI DrawPaper(HWND hWnd, HDC hDC)
 void WINAPI DrawAll(HWND hWnd, HDC hDC)
 {
     DrawStretchBitmap(hDC, g_hImageLoaded, W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));
+    DrawClipArt(hWnd, hDC);
     DrawTextAll(hWnd, hDC);
 
     // 이미지 여러 개
@@ -581,6 +726,7 @@ BOOL WINAPI OpenImage(HWND hWnd, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR 
 {
     OPENFILENAME ofn;
     BOOL rv; //return value
+    //static HENHMETAFILE hEnh;
 
     ZeroMemory(&ofn, sizeof(OPENFILENAME));
     ofn.lStructSize = sizeof(OPENFILENAME);
@@ -592,7 +738,24 @@ BOOL WINAPI OpenImage(HWND hWnd, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR 
 
     // 파일열기 대화상자를 열고, 선택된 파일의 이름을 에디트 박스로 복사
     if ((rv = GetOpenFileName(&ofn)) != 0)
+    {
+        if (g_hEnh) DeleteEnhMetaFile(g_hEnh);
+        g_hEnh = ReadMeta(Buff);
+        if (g_hEnh) {
+            InvalidateRect(hWnd, NULL, TRUE);
+        }
+    }
+
+    /*if ((rv = GetOpenFileName(&ofn)) != 0)
         SetWindowText(g_hEditFileToBeOpened, ofn.lpstrFile);
+
+    if (GetOpenFileName(&ofn)) {
+        if (g_hEnh) DeleteEnhMetaFile(g_hEnh);
+        g_hEnh = ReadMeta(Buff);
+        if (g_hEnh) {
+            InvalidateRect(hWnd, NULL, TRUE);
+        }
+    }*/
 
     return rv;
 }
@@ -857,7 +1020,11 @@ void WINAPI AddTextProc(HWND hWnd)
 //-----------------------------------------------------------------------------
 void WINAPI AddClipArtProc(HWND hWnd)
 {
-    
+    char szFileName[MAX_PATH];
+    szFileName[0] = 0;
+
+    if (OpenImage(hWnd, szFileName, sizeof(szFileName), "이미지 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) return;
+    SetWindowText(g_hEditFileToBeOpened, szFileName);
 }
 
 
@@ -869,6 +1036,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     MousePanning(hWnd, message, wParam, lParam);
     POINT P;
+    //HENHMETAFILE hEnh;
 
     switch (message)
     {
@@ -881,6 +1049,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:        //윈도우가 파기될 때
         if (g_hImageLoaded) DeleteObject(g_hImageLoaded);
         if (g_hPenPapaer)   DeleteObject(g_hPenPapaer);
+        if (g_hEnh) DeleteEnhMetaFile(g_hEnh);
         PostQuitMessage(0); //GetMessage()의 리턴을 FALSE로 만들어 종료하게 함
         return 0;
 
