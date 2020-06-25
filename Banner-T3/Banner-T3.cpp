@@ -109,18 +109,18 @@ HDC WINAPI GetPrinterDC(HWND Hwnd)
 //-----------------------------------------------------------------------------
 HENHMETAFILE ConvertWinToEnh(LPTSTR wmf)
 {
-    //HENHMETAFILE hEnh;
-    HMETAFILE wfile;
-    DWORD dwSize;
-    LPBYTE pBits;
-    METAFILEPICT mp;
-    HDC hdc;
+    HMETAFILE       wfile;
+    DWORD           dwSize;
+    LPBYTE          pBits;
+    METAFILEPICT    mp;
+    HDC             hdc;
 
     // 16비트 메타 파일을 읽고 메타 파일 크기만큼 메모리를 할당한다.
     wfile = GetMetaFile(wmf);
     if (wmf == NULL)
         return NULL;
     dwSize = GetMetaFileBitsEx(wfile, 0, NULL);
+
     if (dwSize == 0) {
         DeleteMetaFile(wfile);
         return NULL;
@@ -129,14 +129,14 @@ HENHMETAFILE ConvertWinToEnh(LPTSTR wmf)
 
     // 메타 파일의 내용을 버퍼로 읽어들인다.
     GetMetaFileBitsEx(wfile, dwSize, pBits);
-    mp.mm = MM_ANISOTROPIC;
+    mp.mm   = MM_ANISOTROPIC;
     mp.xExt = 1000;
     mp.yExt = 1000;
-    mp.hMF = NULL;
+    mp.hMF  = NULL;
 
     // 32비트 메타 파일을 만든다.
-    hdc = GetDC(NULL);
-    g_hEnh = SetWinMetaFileBits(dwSize, pBits, hdc, &mp);
+    hdc     = GetDC(NULL);
+    g_hEnh  = SetWinMetaFileBits(dwSize, pBits, hdc, &mp);
     ReleaseDC(NULL, hdc);
     DeleteMetaFile(wfile);
     free(pBits);
@@ -151,7 +151,7 @@ typedef struct
 {
     DWORD		dwKey;
     WORD		hmf;
-    SMALL_RECT	bbox;
+    SMALL_RECT	bbox;           // long이 아닌 short로 선언되어 있음
     WORD		wInch;
     DWORD		dwReserved;
     WORD		wCheckSum;
@@ -163,7 +163,6 @@ typedef struct
 //-----------------------------------------------------------------------------
 HENHMETAFILE ConvertPlaToEnh(LPTSTR szFileName)
 {
-    //HENHMETAFILE	hEnh;
     DWORD			dwSize;
     LPBYTE			pBits;
     METAFILEPICT	mp;
@@ -172,14 +171,15 @@ HENHMETAFILE ConvertPlaToEnh(LPTSTR szFileName)
 
     // 32비트 메타 파일이 아니면 플레이스블 메타 파일로 읽는다.
     // 파일 크기만큼 메모리를 할당하고 메타 파일을 읽어들인다.
-    hFile = CreateFile(szFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL, NULL);
+    hFile = CreateFile(szFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
     if (hFile == INVALID_HANDLE_VALUE)
         return NULL;
     dwSize = GetFileSize(hFile, NULL);
     pBits = (LPBYTE)malloc(dwSize);
     ReadFile(hFile, pBits, dwSize, &dwSize, NULL);
     CloseHandle(hFile);
+
     // 플레이스블 메타 파일이 맞는지 확인한다.
     if (((PAPMHEADER)pBits)->dwKey != 0x9ac6cdd7l) {
         free(pBits);
@@ -209,20 +209,20 @@ HENHMETAFILE ConvertPlaToEnh(LPTSTR szFileName)
 //-----------------------------------------------------------------------------
 HENHMETAFILE ReadMeta(LPTSTR FileName)
 {
-    //HENHMETAFILE hEnh;
     // 32비트 메타 파일의 핸들을 구해 리턴한다.
     g_hEnh = GetEnhMetaFile(FileName);
-    if (g_hEnh != NULL)
-        return g_hEnh;
+    if (g_hEnh != NULL) return g_hEnh;
+
     // 32비트 메타 파일이 아닐 경우 16비트 포멧으로 읽어보고 32비트 전환한다.
     g_hEnh = ConvertWinToEnh(FileName);
-    if (g_hEnh != NULL)
-        return g_hEnh;
+    if (g_hEnh != NULL) return g_hEnh;
+
     // 16비트 메타 파일도 아닐 경우 플레이스블 메타 파일을 32비트로 전환한다.
     g_hEnh = ConvertPlaToEnh(FileName);
-    if (g_hEnh != NULL)
-        return g_hEnh;
+    if (g_hEnh != NULL) return g_hEnh;
+
     // 세 경우 다 해당하지 않을 경우 NULL을 리턴한다.
+    printf("셋다 안걸림\n");
     return NULL;
 }
 
@@ -492,13 +492,10 @@ void WINAPI CreateComboBox(HWND hWnd)
 //-----------------------------------------------------------------------------
 void WINAPI DrawClipArt(HWND hWnd, HDC hDC)
 {
-    //HENHMETAFILE hEnh;
     RECT rt;
 
-    if (g_hEnh) {
-        GetClientRect(hWnd, &rt);
-        PlayEnhMetaFile(hDC, g_hEnh, &rt);
-    }
+    SetRect(&rt, 100, 100, 400, 400);
+    PlayEnhMetaFile(hDC, g_hEnh, &rt);
 }
 
 
@@ -560,9 +557,9 @@ void WINAPI DrawPaper(HWND hWnd, HDC hDC)
 //-----------------------------------------------------------------------------
 void WINAPI DrawAll(HWND hWnd, HDC hDC)
 {
-    DrawStretchBitmap(hDC, g_hImageLoaded, W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));
-    DrawClipArt(hWnd, hDC);
-    DrawTextAll(hWnd, hDC);
+    DrawStretchBitmap(hDC, g_hImageLoaded, W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));   // 이미지를 그림
+    DrawClipArt(hWnd, hDC);                                                                     // 클립아트를 그림
+    DrawTextAll(hWnd, hDC);                                                                     // 텍스트를 그림
 
     // 이미지 여러 개
     //DrawStretchBitmap(hDC, g_hImageLoadedArr[g_imgCnt], W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));
@@ -577,7 +574,7 @@ void WINAPI DrawImgVertex(HDC hdc)
 {
     DrawCircle(hdc, W2DX(g_imgSzX), (W2DY(g_imgSzY) / 2), RADIUS);      // 우측 모서리 중앙
     DrawCircle(hdc, (W2DX(g_imgSzX) / 2), W2DY(g_imgSzY), RADIUS);      // 아래 모서리 중앙
-    DrawCircle(hdc, W2DX(g_imgSzX), W2DY(g_imgSzY), RADIUS);      // 우측 하단 꼭짓점
+    DrawCircle(hdc, W2DX(g_imgSzX), W2DY(g_imgSzY), RADIUS);            // 우측 하단 꼭짓점
 }
 
 
@@ -589,11 +586,11 @@ void WINAPI DrawSizeInfoLine(HWND hWnd)
 {
     HDC hdc = GetDC(hWnd);
 
-    SetROP2(hdc, R2_XORPEN);   // GDI함수가 화면에 출력을 내보낼 때 화면에 이미 출력되어 있는 그림과 새로 그려지는 그림과의 관계를 정의하는 함수
+    SetROP2(hdc, R2_XORPEN);                            // GDI함수가 화면에 출력을 내보낼 때 화면에 이미 출력되어 있는 그림과 새로 그려지는 그림과의 관계를 정의하는 함수
     SelectObject(hdc, GetStockObject(WHITE_PEN));
-    DrawImgBoundaryLine(hdc);  // 이미지 경계선
-    DrawImgVertex(hdc);        // 이미지 꼭짓점
-    InvalidateRect(hWnd, NULL, FALSE); // 적용하면 텍스트 잔상처리가 해결되지만 반짝거리고 안하면 텍스트 잔상처리가 해결안됨
+    DrawImgBoundaryLine(hdc);                           // 이미지 경계선
+    DrawImgVertex(hdc);                                 // 이미지 꼭짓점
+    InvalidateRect(hWnd, NULL, FALSE);                  // 적용하면 텍스트 잔상처리가 해결되지만 반짝거리고 안하면 텍스트 잔상처리가 해결안됨
     ReleaseDC(hWnd, hdc);
 }
 
@@ -628,7 +625,6 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
 
 ProcExit:
     ReleaseDC(hWnd, hdc);
-    //printf("DragingMode=%d\n",DragingMode);
     return DragingMode;
 }
 
@@ -725,8 +721,7 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
 BOOL WINAPI OpenImage(HWND hWnd, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR Filter)
 {
     OPENFILENAME ofn;
-    BOOL rv; //return value
-    //static HENHMETAFILE hEnh;
+    BOOL rv; // return value
 
     ZeroMemory(&ofn, sizeof(OPENFILENAME));
     ofn.lStructSize = sizeof(OPENFILENAME);
@@ -741,21 +736,9 @@ BOOL WINAPI OpenImage(HWND hWnd, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR 
     {
         if (g_hEnh) DeleteEnhMetaFile(g_hEnh);
         g_hEnh = ReadMeta(Buff);
-        if (g_hEnh) {
-            InvalidateRect(hWnd, NULL, TRUE);
-        }
+
+        if (g_hEnh) InvalidateRect(hWnd, NULL, TRUE);
     }
-
-    /*if ((rv = GetOpenFileName(&ofn)) != 0)
-        SetWindowText(g_hEditFileToBeOpened, ofn.lpstrFile);
-
-    if (GetOpenFileName(&ofn)) {
-        if (g_hEnh) DeleteEnhMetaFile(g_hEnh);
-        g_hEnh = ReadMeta(Buff);
-        if (g_hEnh) {
-            InvalidateRect(hWnd, NULL, TRUE);
-        }
-    }*/
 
     return rv;
 }
@@ -1056,8 +1039,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_PAINT:          //화면을 그려야 할 이유가 생겼을 떄
         PAINTSTRUCT PS;
         BeginPaint(hWnd, &PS);
-        DrawAll(hWnd, PS.hdc);
-        DrawPaper(hWnd, PS.hdc);
+        DrawAll(hWnd, PS.hdc);          // 이미지, 텍스트, 클립아트를 그림
+        DrawPaper(hWnd, PS.hdc);        // 미리보기 선을 그림
         EndPaint(hWnd, &PS);
         return 0;
 
