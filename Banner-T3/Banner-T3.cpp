@@ -4,38 +4,37 @@
 #include <math.h>
 #include "resource.h"
 #include <stdio.h>
-#include <string.h>
 #include "Banner-T3.h"
-#include "d2d1.h"
 
 //-------------------------------------------------------------------------------------------------
 // Macro Definitions
-#define MAX_LOADSTRING 100
-#define RADIUS 5                               // 이미지 꼭짓점 반지름
+#define MAX_LOADSTRING 100                      
+#define RADIUS 5                                // 이미지 꼭짓점 반지름
 
-#define countof(strucName) (sizeof(strucName) / sizeof(strucName[0]))
+#define COUNTOF(strucName) (sizeof(strucName) / sizeof(strucName[0]))   // 배열 해당 원소의 크기를 구하기 위함
 
-#define VERTEX_NOSELECTED       -2
-#define VERTEX_INTEXT_1         -3
-#define VERTEX_INTEXT_2         -4
-#define VERTEX_INTEXT_3         -5
+#define ADJUST_WIDTH      1                     // 이미지 오른쪽 테두리
+#define ADJUST_HEIGHT     2                     // 이미지 하단 테두리
+#define ADJUST_DIAGONAL   3                     // 이미지 오른쪽 하단 꼭짓점
 
-#define VERTEX_ADJUSTWIDTH      0
-#define VERTEX_ADJUSTHEIGHT     1
-#define VERTEX_ADJUSTDIAGONAL   2
-#define VERTEX_IMAGE_LENGTH     3
+#define NO_SELECTED       0                     // 이미지를 선택하지 않은 경우
+#define IN_TEXT_1         10                    // 첫 번째 이미지를 선택한 경우
+#define IN_TEXT_2         20                    // 두 번째 이미지를 선택한 경우
+#define IN_TEXT_3         30                    // 세 번째 이미지를 선택한 경우
 
-#define PAPERXSIZE  2100                        // A4 가로 mm
-#define PAPERYSIZE  2970                        // A4 세로 mm
-#define CL 5                                    // 이미지 테두리
-#define ZOOMBASE    1000
+#define IN_CLIPART        100                   // 첫 번째 클립아트를 선택한 경우
+
+#define PAPER_X_SIZE  2100                      // A4 가로 mm
+#define PAPER_Y_SIZE  2970                      // A4 세로 mm
+#define CL 5                                    // 마우스로 이미지 늘이거나 줄이기 위해 hover했을 때 커서 바뀌게 하기 위함
+#define ZOOMBASE    1000                        // 이미지 확대 및 축소하는 기준점의 초깃값
 #define MAX_TEXT    10                          // 추가할 수 있는 텍스트 최대 개수
 #define MAX_IMAGE   10                          // 추가할 수 있는 이미지 최대 개수
 
-typedef const unsigned char* LPCBYTE;
-typedef const int* LPCINT;
-typedef short* LPINT16;
-typedef const short* LPCINT16;
+typedef const unsigned char * LPCBYTE;
+typedef const int           *  LPCINT;
+typedef short               * LPINT16;
+typedef const short         * LPCINT16;
 
 #define LoInt16(L)      *(LPINT16)&L            //ARM에서는 선별적으로 사용할 것
 #define HiInt16(L)      *((LPINT16)&L+1)        //      "
@@ -63,7 +62,7 @@ static int      g_textCnt = 0;                  // 텍스트 개수
 static RGBQUAD  g_textColor[3];                 // 사용자가 선택한 글자 색상
 
 //작업중인 이미지 관련
-static HPEN     g_hPenPapaer;
+static HPEN     g_hPenPapaer;                   // 작업영역 A4 그리드의 색상을 적용하기 위함
 static HBITMAP  g_hImageLoaded;                 // 로딩된 HBITMAP
 static RECT     g_imgRect;                      // 이미지 좌표
 
@@ -73,15 +72,16 @@ static RECT     g_imgRect;                      // 이미지 좌표
 //static int      g_imgCnt = 0;
 
 // 작업중인 클립아트 관련;
-static HENHMETAFILE g_hEnh;
+static HENHMETAFILE g_hEnh;                     
 
 //작업중인 텍스트 관련
 static RECT g_textRect[3];                      // 텍스트 외곽 좌표
 static int  g_prevTextSz;                       // 미리보기에서 텍스트 크기
 
 //작업중인 A4 관련
-static int PAPERXQTY;                           // 사용자가 입력할 A4용지 가로 장 수
-static int PAPERYQTY;                           // 사용자가 입력할 A4용지 세로 장 수
+static bool g_A4Status = FALSE;                 // 사용자로부터 A4 장 수를 올바르게 입력받았는지 '상태'를 나타내는 변수
+static int  PAPERXQTY;                           // 사용자가 입력할 A4용지 가로 장 수
+static int  PAPERYQTY;                           // 사용자가 입력할 A4용지 세로 장 수
 
 //-----------------------------------------------------------------------------
 //      PrinterDC를 호출합니다
@@ -180,7 +180,7 @@ HENHMETAFILE ConvertPlaToEnh(LPTSTR szFileName)
     ReadFile(hFile, pBits, dwSize, &dwSize, NULL);
     CloseHandle(hFile);
 
-    // 플레이스블 메타 파일이 맞는지 확인한다.
+    // Placeable 메타 파일이 맞는지 확인한다.
     if (((PAPMHEADER)pBits)->dwKey != 0x9ac6cdd7l) {
         free(pBits);
         return NULL;
@@ -193,6 +193,7 @@ HENHMETAFILE ConvertPlaToEnh(LPTSTR szFileName)
     mp.yExt = ((PAPMHEADER)pBits)->bbox.Bottom - ((PAPMHEADER)pBits)->bbox.Top;
     mp.yExt = (mp.yExt * 2540l) / (DWORD)(((PAPMHEADER)pBits)->wInch);
     mp.hMF = NULL;
+
     // 메타 파일을 만든다.
     hdc = GetDC(NULL);
     g_hEnh = SetWinMetaFileBits(dwSize, &(pBits[sizeof(APMHEADER)]), hdc, &mp);
@@ -222,7 +223,6 @@ HENHMETAFILE ReadMeta(LPTSTR FileName)
     if (g_hEnh != NULL) return g_hEnh;
 
     // 세 경우 다 해당하지 않을 경우 NULL을 리턴한다.
-    printf("셋다 안걸림\n");
     return NULL;
 }
 
@@ -252,11 +252,11 @@ void WINAPI DrawCircle(HDC hDC, int X, int Y, int Rad)
 //-----------------------------------------------------------------------------
 //      WorkSpace 좌표와 Device 좌표 사이를 서로 변환
 //-----------------------------------------------------------------------------
-int W2D(int R) { return MulDiv(R, g_zoomVal, ZOOMBASE); }                      // 크기 변환하는 함수
+int W2D(int R) { return MulDiv(R, g_zoomVal, ZOOMBASE); }                       // WorkSpace to Device(크기 변환하는 함수)
 int W2DX(int X) { return MulDiv(X - g_panningX, g_zoomVal, ZOOMBASE); }         // 이미지 부분에 사용(StretchBlt)
 int W2DY(int Y) { return MulDiv(Y - g_panningY, g_zoomVal, ZOOMBASE); }         // 이미지 부분에 사용(StretchBlt)
 
-int D2W(int R) { return MulDiv(R, ZOOMBASE, g_zoomVal); }
+int D2W(int R) { return MulDiv(R, ZOOMBASE, g_zoomVal); }                       // Device to WorkSpace(크기 변환하는 함수)
 int D2WX(int X) { return MulDiv(X, ZOOMBASE, g_zoomVal) + g_panningX; }
 int D2WY(int Y) { return MulDiv(Y, ZOOMBASE, g_zoomVal) + g_panningY; }
 
@@ -543,9 +543,9 @@ void WINAPI DrawPaper(HWND hWnd, HDC hDC)
     {
         for (X = 0; X < PAPERXQTY; X++)
         {
-            px = X * PAPERXSIZE;
-            py = Y * PAPERYSIZE;
-            Rectangle(hDC, W2DX(px), W2DY(py), W2DX(px + PAPERXSIZE), W2DY(py + PAPERYSIZE));
+            px = X * PAPER_X_SIZE;
+            py = Y * PAPER_Y_SIZE;
+            Rectangle(hDC, W2DX(px), W2DY(py), W2DX(px + PAPER_X_SIZE), W2DY(py + PAPER_Y_SIZE));
         }
     }
 }
@@ -601,10 +601,10 @@ void WINAPI DrawSizeInfoLine(HWND hWnd)
 //-----------------------------------------------------------------------------
 int WINAPI GetDragingMode(HWND hWnd, POINT P)
 {
-    int  i, DragingMode = VERTEX_NOSELECTED;
+    int  i, DragingMode = NO_SELECTED;
     HDC  hdc;
     RECT R;
-    static const int TextSelMode[] = { VERTEX_INTEXT_1, VERTEX_INTEXT_2, VERTEX_INTEXT_3 };
+    static const int TextSelMode[] = { IN_TEXT_1, IN_TEXT_2, IN_TEXT_3 };
 
     hdc = GetDC(hWnd);
 
@@ -615,13 +615,13 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
     }
 
     SetRect(&R, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) + CL, W2DY(g_imgSzY) + CL);
-    if (PtInRect(&R, P)) { DragingMode = VERTEX_ADJUSTDIAGONAL; goto ProcExit; }
+    if (PtInRect(&R, P)) { DragingMode = ADJUST_DIAGONAL; goto ProcExit; }
 
     SetRect(&R, W2DX(g_imgSzX) - CL, W2DY(0), W2DX(g_imgSzX) + CL, W2DY(g_imgSzY) - CL);
-    if (PtInRect(&R, P)) { DragingMode = VERTEX_ADJUSTWIDTH; goto ProcExit; }
+    if (PtInRect(&R, P)) { DragingMode = ADJUST_WIDTH; goto ProcExit; }
 
     SetRect(&R, W2DX(0), W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) + CL);
-    if (PtInRect(&R, P)) { DragingMode = VERTEX_ADJUSTHEIGHT; goto ProcExit; }
+    if (PtInRect(&R, P)) { DragingMode = ADJUST_HEIGHT; goto ProcExit; }
 
 ProcExit:
     ReleaseDC(hWnd, hdc);
@@ -641,12 +641,12 @@ void WINAPI HandleDragingMode(HWND hWnd, int DragingMode, int DX, int DY)
 
     switch (DragingMode)
     {
-    case VERTEX_ADJUSTWIDTH:    g_imgSzX += DX; break;
-    case VERTEX_ADJUSTHEIGHT:   g_imgSzY += DY; break;
-    case VERTEX_ADJUSTDIAGONAL: g_imgSzX += DX; g_imgSzY += DY; break;
-    case VERTEX_INTEXT_1: i = 0; goto AdjText;
-    case VERTEX_INTEXT_2: i = 1; goto AdjText;
-    case VERTEX_INTEXT_3: i = 2; //goto AdjText;
+    case ADJUST_WIDTH:    g_imgSzX += DX; break;
+    case ADJUST_HEIGHT:   g_imgSzY += DY; break;
+    case ADJUST_DIAGONAL: g_imgSzX += DX; g_imgSzY += DY; break;
+    case IN_TEXT_1: i = 0; goto AdjText;                              // 첫 번째 텍스트
+    case IN_TEXT_2: i = 1; goto AdjText;                              // 두 번째 텍스트
+    case IN_TEXT_3: i = 2;                                            // 세 번째 텍스트
     AdjText:
         OffsetRect(&g_textRect[i], DX, DY);
     }
@@ -661,7 +661,7 @@ void WINAPI HandleDragingMode(HWND hWnd, int DragingMode, int DX, int DY)
 //-----------------------------------------------------------------------------
 void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
 {
-    static int DragingMode = VERTEX_NOSELECTED;
+    static int DragingMode = NO_SELECTED;
     static POINT oldP;
     static int currZoom = 4;
     static const int zoomTable[] = { 2000, 1000, 500, 250, 125, 63, 31, 15 };
@@ -672,7 +672,7 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
         oldP.x = LoInt16(lPrm);
         oldP.y = HiInt16(lPrm);
 
-        if ((DragingMode = GetDragingMode(hWnd, oldP)) == VERTEX_NOSELECTED) break;
+        if ((DragingMode = GetDragingMode(hWnd, oldP)) == NO_SELECTED) break;
         DrawSizeInfoLine(hWnd); 
 
         SetCapture(hWnd);
@@ -703,7 +703,7 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
         }
         else                                                                    //마우스휠을 내릴 경우 '축소'
         {
-            if (currZoom < countof(zoomTable) - 1)
+            if (currZoom < COUNTOF(zoomTable) - 1)
             {
                 g_zoomVal = zoomTable[++currZoom];
                 InvalidateRect(hWnd, NULL, TRUE);
@@ -716,7 +716,7 @@ void MousePanning(HWND hWnd, UINT Msg, WPARAM wPrm, LPARAM lPrm)
 
 
 //----------------------------------------------------------------------------
-//      파일을 열어 이미지를 선택합니다.
+//      파일을 열어 이미지 또는 클립아트를 선택합니다.
 //----------------------------------------------------------------------------
 BOOL WINAPI OpenImage(HWND hWnd, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR Filter)
 {
@@ -750,14 +750,13 @@ BOOL WINAPI OpenImage(HWND hWnd, LPSTR Buff, int BuffSize, LPCSTR Title, LPCSTR 
 //-----------------------------------------------------------------------------
 void WINAPI SaveA4Info(HWND hWnd)
 {
-    if (GetDlgItemInt(hWnd, IDC_A4_WIDTH_EDIT, NULL, FALSE) == 0 || GetDlgItemInt(hWnd, IDC_A4_HEIGHT_EDIT, NULL, FALSE) == 0)
-    {
-        MessageBox(hWnd, "공백을 입력해 주세요.", "알림", MB_OK);
-    }
+    if (GetDlgItemInt(hWnd, IDC_A4_WIDTH_EDIT, NULL, FALSE) == FALSE || GetDlgItemInt(hWnd, IDC_A4_HEIGHT_EDIT, NULL, FALSE) == FALSE)
+        MessageBox(hWnd, "입력 칸에 정수를 입력해 주세요.", "알림", MB_OK);
     else
     {
         PAPERXQTY = GetDlgItemInt(hWnd, IDC_A4_WIDTH_EDIT, NULL, FALSE);
         PAPERYQTY = GetDlgItemInt(hWnd, IDC_A4_HEIGHT_EDIT, NULL, FALSE);
+        g_A4Status = TRUE;
     }
 }
 
@@ -816,16 +815,16 @@ void WINAPI Print(HWND hWnd)
     prtResX = GetDeviceCaps(hPrnDC, HORZRES);
     prtResY = GetDeviceCaps(hPrnDC, VERTRES);
 
-    g_zoomVal = prtResX * 1000 / PAPERXSIZE;
+    g_zoomVal = prtResX * 1000 / PAPER_X_SIZE;
 
     for (Y = 0; Y < PAPERYQTY; Y++)
     {
         for (X = 0; X < PAPERXQTY; X++)
         {
             StartPage(hPrnDC);
-            g_panningX = X * PAPERXSIZE;
-            g_panningY = Y * PAPERYSIZE;
-            DrawAll(hWnd, hPrnDC);
+            g_panningX = X * PAPER_X_SIZE;
+            g_panningY = Y * PAPER_Y_SIZE;
+            DrawAll(hWnd, hPrnDC); // 이미지, 텍스트, 클립아트를 출력물에 그림
             EndPage(hPrnDC);
         }
     }
@@ -837,6 +836,9 @@ ProcExit:
     g_panningX = orgPanX;
     g_panningY = orgPanY;
 }
+
+
+
 //-----------------------------------------------------------------------------
 //      A4 용지 셋팅 다이얼로그를 호출합니다
 //-----------------------------------------------------------------------------
@@ -931,7 +933,7 @@ BOOL CALLBACK TextDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM 
     switch (iMessage)
     {
     case WM_INITDIALOG:
-        CreateComboBox(hWnd);
+        CreateComboBox(hWnd); // 글꼴, 사이즈 콤보박스 생성
         return TRUE;
 
     case WM_PAINT:
@@ -949,7 +951,7 @@ BOOL CALLBACK TextDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM 
             return 0;
 
         case IDOK:
-            SaveTextInfo(hWnd);
+            SaveTextInfo(hWnd); // 문자열, 글꼴, 사이즈, 색상 정보 저장
             EndDialog(hWnd, IDOK);
             return TRUE;
 
@@ -985,12 +987,10 @@ void WINAPI AddImgProc(HWND hWnd)
 //-----------------------------------------------------------------------------
 void WINAPI AddTextProc(HWND hWnd)
 {
-    if (g_textCnt < 3)
+    if (g_textCnt < 3) // 텍스트를 3개까지 추가 가능
     {
-        printf("AddTextProc 실행 시작\n");
         if (DialogBox(hInst, MAKEINTRESOURCE(IDD_ADD_TEXT_DLG), hWnd, TextDialogBoxProc) == IDOK) g_textCnt++;
         InvalidateRect(hWnd, NULL, TRUE); // WndProc 내 WM_PAINT 메시지가 다시 발생한다.
-        printf("AddTextProc 실행 종료\n");
     }
     else
         MessageBox(hWnd, "텍스는 3개까지 추가가 가능합니다.", "알림", MB_OK);
@@ -1006,8 +1006,32 @@ void WINAPI AddClipArtProc(HWND hWnd)
     char szFileName[MAX_PATH];
     szFileName[0] = 0;
 
-    if (OpenImage(hWnd, szFileName, sizeof(szFileName), "이미지 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) return;
+    if (OpenImage(hWnd, szFileName, sizeof(szFileName), "클립아트(WMF 또는 EMF) 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) return;
     SetWindowText(g_hEditFileToBeOpened, szFileName);
+}
+
+
+
+//-----------------------------------------------------------------------------
+//      정보 대화 상자의 메시지 처리기입니다.
+//-----------------------------------------------------------------------------
+INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
 }
 
 
@@ -1019,20 +1043,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     MousePanning(hWnd, message, wParam, lParam);
     POINT P;
-    //HENHMETAFILE hEnh;
 
     switch (message)
     {
     case WM_CREATE:         //윈도우가 생성될 때 한번 옴
-        DialogBox(hInst, MAKEINTRESOURCE(IDD_INIT_DLG), hWnd, A4DialogBoxProc); // 사용자로부터 A4 장 수 입력 받음
-        lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();                        //테스트용임
+        while (!g_A4Status)
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_INIT_DLG), hWnd, A4DialogBoxProc); // 사용자로부터 A4 장 수 입력받음
+
+        lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();    // 테스트할 때 이미지 열기 귀찮아서 한가인 사진으로 설정해놓음
         g_hPenPapaer = CreatePen(PS_SOLID, 1, RGB(109, 202, 185));
         return 0;
 
     case WM_DESTROY:        //윈도우가 파기될 때
         if (g_hImageLoaded) DeleteObject(g_hImageLoaded);
         if (g_hPenPapaer)   DeleteObject(g_hPenPapaer);
-        if (g_hEnh) DeleteEnhMetaFile(g_hEnh);
+        if (g_hEnh)         DeleteEnhMetaFile(g_hEnh);
         PostQuitMessage(0); //GetMessage()의 리턴을 FALSE로 만들어 종료하게 함
         return 0;
 
@@ -1059,6 +1084,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case ID_PRINT:
             Print(hWnd); break;
 
+        case IDM_ABOUT:
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+            break;
+
         case IDM_EXIT:
             DestroyWindow(hWnd); break;
         }
@@ -1069,12 +1098,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         ScreenToClient(hWnd, &P); // 노트북 화면이 기준이 아니라 윈도우 메인 화면을 기준으로 함
         switch (GetDragingMode(hWnd, P))
         {
-        case VERTEX_ADJUSTWIDTH:      SetCursor(LoadCursor(NULL, IDC_SIZEWE));      return TRUE;
-        case VERTEX_ADJUSTHEIGHT:     SetCursor(LoadCursor(NULL, IDC_SIZENS));      return TRUE;
-        case VERTEX_ADJUSTDIAGONAL:   SetCursor(LoadCursor(NULL, IDC_SIZENWSE));    return TRUE;
-        case VERTEX_INTEXT_1:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
-        case VERTEX_INTEXT_2:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
-        case VERTEX_INTEXT_3:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case ADJUST_WIDTH:      SetCursor(LoadCursor(NULL, IDC_SIZEWE));      return TRUE;
+        case ADJUST_HEIGHT:     SetCursor(LoadCursor(NULL, IDC_SIZENS));      return TRUE;
+        case ADJUST_DIAGONAL:   SetCursor(LoadCursor(NULL, IDC_SIZENWSE));    return TRUE;
+        case IN_TEXT_1:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case IN_TEXT_2:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case IN_TEXT_3:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         }
         break;
 
