@@ -22,7 +22,8 @@
 #define IN_TEXT_2         20                    // 두 번째 이미지를 선택한 경우
 #define IN_TEXT_3         30                    // 세 번째 이미지를 선택한 경우
 
-#define IN_CLIPART        100                   // 첫 번째 클립아트를 선택한 경우
+#define IN_CLIPART        100                   // 첫 번째 클립아트 내부(위치 조정)를 선택한 경우
+#define LINE_CLIPART      200                   // 첫 번째 클립아트 경계선(크기 조절 위함)을 선택한 경우
 
 #define PAPER_X_SIZE  2100                      // A4 가로 mm
 #define PAPER_Y_SIZE  2970                      // A4 세로 mm
@@ -53,8 +54,10 @@ static int g_imgSzX, g_imgSzY;                  // Work영역 상의 이미지 �
 
 static HWND g_hButtonOpenFileDialog;            // 파일열기 대화상자를 실행하기 위한 버튼의 핸들
 static HWND g_hEditFileToBeOpened;              // 파일의 경로와 이름을 가져오는 에디트 컨트롤의 핸들
-static char g_imgRoute[256];                    // 이미지 경로 ex)"C:\project\Banner\banner\girl.bmp"
 
+//작업중인 텍스트 관련
+static RECT     g_textRect[3];                  // 텍스트 외곽 좌표
+static int      g_prevTextSz;                   // 미리보기에서 텍스트 크기
 static int      g_textSz[3];                    // 사용자가 콤보박스에서 선택한 글자 크기(pt)
 static char*    g_textFontArr[3];               // 사용자가 선택한 글꼴을 모아놓은 배열
 static char*    g_textStrArr[3];                // 사용자가 입력한 텍스트를 모아놓은 배열
@@ -63,25 +66,25 @@ static RGBQUAD  g_textColor[3];                 // 사용자가 선택한 글자
 
 //작업중인 이미지 관련
 static HPEN     g_hPenPapaer;                   // 작업영역 A4 그리드의 색상을 적용하기 위함
+static char     g_imgRoute[256];                // 이미지 경로 ex)"C:\project\Banner\banner\girl.bmp"
 static HBITMAP  g_hImageLoaded;                 // 로딩된 HBITMAP
 static RECT     g_imgRect;                      // 이미지 좌표
-
 //static RECT     g_imgRectArr[MAX_IMAGE];
 //static BITMAP   g_bmArr[MAX_IMAGE];
 //static HBITMAP  g_hImageLoadedArr[MAX_IMAGE];
 //static int      g_imgCnt = 0;
 
 // 작업중인 클립아트 관련;
-static HENHMETAFILE g_hEnh;                     
-
-//작업중인 텍스트 관련
-static RECT g_textRect[3];                      // 텍스트 외곽 좌표
-static int  g_prevTextSz;                       // 미리보기에서 텍스트 크기
+static HENHMETAFILE g_hEnh;    
+static char         g_clipArtRoute[256];        // 클립아트 경로
+static int          g_clipArtSzX = 2100;
+static int          g_clipArtSzY = 2100;
+static RECT         g_clipArtRect;              // 클립아트를 그리는 좌표
 
 //작업중인 A4 관련
 static bool g_A4Status = FALSE;                 // 사용자로부터 A4 장 수를 올바르게 입력받았는지 '상태'를 나타내는 변수
-static int  PAPERXQTY;                           // 사용자가 입력할 A4용지 가로 장 수
-static int  PAPERYQTY;                           // 사용자가 입력할 A4용지 세로 장 수
+static int  g_PAPERXQTY;                        // 사용자가 입력할 A4용지 가로 장 수
+static int  g_PAPERYQTY;                        // 사용자가 입력할 A4용지 세로 장 수
 
 //-----------------------------------------------------------------------------
 //      PrinterDC를 호출합니다
@@ -284,7 +287,6 @@ void WINAPI LoadBmpImage(void)
     {
         GetObject(g_hImageLoaded, sizeof(BITMAP), &bm);
 
-        // GetSystemMetrics();
         g_imgSzX = (int)((bm.bmWidth / 25.4) * 280);      
         g_imgSzY = (int)((bm.bmHeight / 25.4) * 280);
     }
@@ -411,6 +413,7 @@ void WINAPI SaveTextInfo(HWND hWnd)
 
         GetTextExtentPoint32(hDC, g_textStrArr[g_textCnt], lstrlen(g_textStrArr[g_textCnt]), &S);
         SetRect(&g_textRect[g_textCnt], 0, 0, S.cx, S.cy);
+        printf("S.cx: %d, S.cy: %d\n", S.cx, S.cy);
 
         DeleteObject(SelectObject(hDC, oldFont));
         ReleaseDC(hWnd, hDC);
@@ -488,14 +491,23 @@ void WINAPI CreateComboBox(HWND hWnd)
 
 
 //-----------------------------------------------------------------------------
-//      윈도우 영역에서 글꼴, 색상, 크기는 여기서 모두 작업합니다
+//      윈도우 영역에서 클립아트는 여기서 모두 작업합니다
 //-----------------------------------------------------------------------------
 void WINAPI DrawClipArt(HWND hWnd, HDC hDC)
 {
-    RECT rt;
+    //SIZE S;
+    //S.cx = W2DX(g_clipArtRect.right);
+    //S.cy = W2DX(g_clipArtRect.bottom);
+    //SetRect(&g_clipArtRect, 0, 0, S.cx, S.cy);
+    //printf("S.cx: %d, S.cy: %d\n", S.cx, S.cy);
 
-    SetRect(&rt, 100, 100, 400, 400);
-    PlayEnhMetaFile(hDC, g_hEnh, &rt);
+    // 클립아트 위치 조정(텍스트는 GetTextExtentPoint32 함수를 써서 동적으로 SIZE 구조체를 채우던데..)
+    //SetRect(&g_clipArtRect, W2DX(g_clipArtRect.left), W2DY(g_clipArtRect.top), W2DX(g_clipArtRect.right), W2DY(g_clipArtRect.bottom));
+    printf("%d %d %d %d\n", g_clipArtRect.left, g_clipArtRect.top, g_clipArtRect.right, g_clipArtRect.bottom);
+    
+    // 클립아트 크기 조절
+    SetRect(&g_clipArtRect, W2DX(0), W2DY(0), W2DX(g_clipArtSzX), W2DY(g_clipArtSzY));
+    PlayEnhMetaFile(hDC, g_hEnh, &g_clipArtRect);
 }
 
 
@@ -505,21 +517,20 @@ void WINAPI DrawClipArt(HWND hWnd, HDC hDC)
 //-----------------------------------------------------------------------------
 void WINAPI DrawTextAll(HWND hWnd, HDC hDC)
 {
-    int   i;
     RECT  R;
     HFONT hFont, oldFont;
 
-    for (i = 0; i < g_textCnt; i++)
+    for (int i = 0; i < g_textCnt; i++)
     {
         SetRect(&R, W2DX(g_textRect[i].left), W2DY(g_textRect[i].top), W2DX(g_textRect[i].right), W2DY(g_textRect[i].bottom));
 
         hFont = MyCreateFont(W2D(g_textSz[i]), FALSE, FALSE, g_textFontArr[i]); // {2: Bold, 3: Italic}
         oldFont = (HFONT)SelectObject(hDC, hFont);
 
-        SetTextColor(hDC, RGB(g_textColor[i].rgbBlue, g_textColor[i].rgbGreen, g_textColor[i].rgbRed));
+        SetTextColor(hDC, RGB(g_textColor[i].rgbBlue, g_textColor[i].rgbGreen, g_textColor[i].rgbRed)); //BGR 순으로해야 색이 정확함
         SetBkMode(hDC, TRANSPARENT);
 
-        DrawTextEx(hDC, g_textStrArr[i], -1, &R, DT_VCENTER | DT_WORDBREAK, NULL);      //실제 문자열을 찍는 문장. rt에 출력한다.
+        DrawTextEx(hDC, g_textStrArr[i], -1, &R, DT_VCENTER | DT_WORDBREAK, NULL);      //실제 문자열을 찍는 문장
 
         SelectObject(hDC, oldFont);
         DeleteObject(hFont);
@@ -539,9 +550,9 @@ void WINAPI DrawPaper(HWND hWnd, HDC hDC)
     SelectObject(hDC, g_hPenPapaer);
     SelectObject(hDC, GetStockObject(NULL_BRUSH));
 
-    for (Y = 0; Y < PAPERYQTY; Y++)
+    for (Y = 0; Y < g_PAPERYQTY; Y++)
     {
-        for (X = 0; X < PAPERXQTY; X++)
+        for (X = 0; X < g_PAPERXQTY; X++)
         {
             px = X * PAPER_X_SIZE;
             py = Y * PAPER_Y_SIZE;
@@ -558,7 +569,7 @@ void WINAPI DrawPaper(HWND hWnd, HDC hDC)
 void WINAPI DrawAll(HWND hWnd, HDC hDC)
 {
     DrawStretchBitmap(hDC, g_hImageLoaded, W2DX(0), W2DY(0), W2DX(g_imgSzX), W2DY(g_imgSzY));   // 이미지를 그림
-    DrawClipArt(hWnd, hDC);                                                                     // 클립아트를 그림
+    DrawClipArt(hWnd, hDC);                                                                     // 클립아트를 그림                                                                                          
     DrawTextAll(hWnd, hDC);                                                                     // 텍스트를 그림
 
     // 이미지 여러 개
@@ -604,16 +615,18 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
     int  i, DragingMode = NO_SELECTED;
     HDC  hdc;
     RECT R;
-    static const int TextSelMode[] = { IN_TEXT_1, IN_TEXT_2, IN_TEXT_3 };
+    static const int textMode[] = { IN_TEXT_1, IN_TEXT_2, IN_TEXT_3 };
 
     hdc = GetDC(hWnd);
 
+    // -------텍스트 부분-------
     for (i = 0; i < g_textCnt; i++)
     {
         SetRect(&R, W2DX(g_textRect[i].left), W2DY(g_textRect[i].top), W2DX(g_textRect[i].right), W2DY(g_textRect[i].bottom));
-        if (PtInRect(&R, P)) { DragingMode = TextSelMode[i]; goto ProcExit; }
+        if (PtInRect(&R, P)) { DragingMode = textMode[i]; goto ProcExit; }
     }
 
+    // -------이미지 부분-------
     SetRect(&R, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) + CL, W2DY(g_imgSzY) + CL);
     if (PtInRect(&R, P)) { DragingMode = ADJUST_DIAGONAL; goto ProcExit; }
 
@@ -622,6 +635,15 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
 
     SetRect(&R, W2DX(0), W2DY(g_imgSzY) - CL, W2DX(g_imgSzX) - CL, W2DY(g_imgSzY) + CL);
     if (PtInRect(&R, P)) { DragingMode = ADJUST_HEIGHT; goto ProcExit; }
+
+    // -------클립아트 부분------
+    // 클립아트 위치를 움직이는 부분
+    SetRect(&R, W2DX(g_clipArtRect.left), W2DY(g_clipArtRect.top), W2DX(g_clipArtRect.right), W2DY(g_clipArtRect.bottom));
+    if (PtInRect(&R, P)) { DragingMode = IN_CLIPART; goto ProcExit; }
+
+    // 클립아트 사이즈를 조정하는 부분
+    SetRect(&R, W2DX(g_clipArtSzX) - CL, W2DY(g_clipArtSzY) - CL, W2DX(g_clipArtSzX) + CL, W2DY(g_clipArtSzY) + CL);
+    if (PtInRect(&R, P)) { DragingMode = LINE_CLIPART; goto ProcExit; }
 
 ProcExit:
     ReleaseDC(hWnd, hdc);
@@ -641,14 +663,18 @@ void WINAPI HandleDragingMode(HWND hWnd, int DragingMode, int DX, int DY)
 
     switch (DragingMode)
     {
-    case ADJUST_WIDTH:    g_imgSzX += DX; break;
-    case ADJUST_HEIGHT:   g_imgSzY += DY; break;
-    case ADJUST_DIAGONAL: g_imgSzX += DX; g_imgSzY += DY; break;
-    case IN_TEXT_1: i = 0; goto AdjText;                              // 첫 번째 텍스트
-    case IN_TEXT_2: i = 1; goto AdjText;                              // 두 번째 텍스트
-    case IN_TEXT_3: i = 2;                                            // 세 번째 텍스트
+    case ADJUST_WIDTH:      g_imgSzX += DX;                         break;
+    case ADJUST_HEIGHT:     g_imgSzY += DY;                         break;
+    case ADJUST_DIAGONAL:   g_imgSzX += DX; g_imgSzY += DY;         break;
+    case IN_TEXT_1:         i = 0;                                  goto AdjText;           // 첫 번째 텍스트
+    case IN_TEXT_2:         i = 1;                                  goto AdjText;           // 두 번째 텍스트
+    case IN_TEXT_3:         i = 2;                                  goto AdjText;           // 세 번째 텍스트
+    case IN_CLIPART:                                                goto AdjText;           // 클립아트 좌표 이동
+    case LINE_CLIPART:      g_clipArtSzX += DX; g_clipArtSzY += DY; break;                  // 클립아트 크기 조정
+
     AdjText:
         OffsetRect(&g_textRect[i], DX, DY);
+        OffsetRect(&g_clipArtRect, DX, DY);
     }
 
     DrawSizeInfoLine(hWnd);
@@ -754,27 +780,24 @@ void WINAPI SaveA4Info(HWND hWnd)
         MessageBox(hWnd, "입력 칸에 정수를 입력해 주세요.", "알림", MB_OK);
     else
     {
-        PAPERXQTY = GetDlgItemInt(hWnd, IDC_A4_WIDTH_EDIT, NULL, FALSE);
-        PAPERYQTY = GetDlgItemInt(hWnd, IDC_A4_HEIGHT_EDIT, NULL, FALSE);
-        g_A4Status = TRUE;
+        g_PAPERXQTY = GetDlgItemInt(hWnd, IDC_A4_WIDTH_EDIT, NULL, FALSE);
+        g_PAPERYQTY = GetDlgItemInt(hWnd, IDC_A4_HEIGHT_EDIT, NULL, FALSE);
+        g_A4Status = TRUE;      // 사용자가 정상적으로 A4 장 수를 입력한 경우(while문을 탈출하기 위함)
     }
 }
 
 
 
 //-----------------------------------------------------------------------------
-//      메인 윈도우 메세지 처리
+//      방향키를 입력받았을 때 전체 화면이 움직이는 함수
 //-----------------------------------------------------------------------------
 void WINAPI KeyProc(HWND hWnd, int key)
 {
-    static int currZoom = 4;
-    static const int zoomTable[] = { 2000, 1000, 500, 250, 125, 63 };
-
     switch (key)
     {
     case VK_LEFT:
         g_panningX += 100;
-        InvalidateRect(hWnd, NULL, TRUE);
+        InvalidateRect(hWnd, NULL, TRUE);       // 세 번째 인자가 FALSE이면 잔상이 남음 
         break;
 
     case VK_RIGHT:
@@ -817,9 +840,9 @@ void WINAPI Print(HWND hWnd)
 
     g_zoomVal = prtResX * 1000 / PAPER_X_SIZE;
 
-    for (Y = 0; Y < PAPERYQTY; Y++)
+    for (Y = 0; Y < g_PAPERYQTY; Y++)
     {
-        for (X = 0; X < PAPERXQTY; X++)
+        for (X = 0; X < g_PAPERXQTY; X++)
         {
             StartPage(hPrnDC);
             g_panningX = X * PAPER_X_SIZE;
@@ -832,9 +855,9 @@ void WINAPI Print(HWND hWnd)
 
 ProcExit:
     if (hPrnDC) DeleteDC(hPrnDC);
-    g_zoomVal = orgZoom;
-    g_panningX = orgPanX;
-    g_panningY = orgPanY;
+    g_zoomVal   = orgZoom;
+    g_panningX  = orgPanX;
+    g_panningY  = orgPanY;
 }
 
 
@@ -883,8 +906,8 @@ BOOL CALLBACK ImageDialogBoxProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM
     {
     case WM_INITDIALOG:
     {
-        g_hButtonOpenFileDialog = GetDlgItem(hWnd, IDC_OPEN_FILE_BTN);
-        g_hEditFileToBeOpened = GetDlgItem(hWnd, IDC_IMG_ROUTE_EDIT);
+        //g_hButtonOpenFileDialog = GetDlgItem(hWnd, IDC_OPEN_FILE_BTN); // 주석처리해도 작동은 잘됨(이유를 모르겠음)
+        g_hEditFileToBeOpened   = GetDlgItem(hWnd, IDC_IMG_ROUTE_EDIT);
         return TRUE;
     }
 
@@ -1008,6 +1031,9 @@ void WINAPI AddClipArtProc(HWND hWnd)
 
     if (OpenImage(hWnd, szFileName, sizeof(szFileName), "클립아트(WMF 또는 EMF) 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) return;
     SetWindowText(g_hEditFileToBeOpened, szFileName);
+    lstrcpy(g_clipArtRoute, szFileName);    // 이미지를 오픈 할때와는 다름(이미지는 editbox에 경로가 넣어졌기 때문에)
+
+    InvalidateRect(hWnd, NULL, TRUE);
 }
 
 
@@ -1047,11 +1073,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
     case WM_CREATE:         //윈도우가 생성될 때 한번 옴
+    {
         while (!g_A4Status)
             DialogBox(hInst, MAKEINTRESOURCE(IDD_INIT_DLG), hWnd, A4DialogBoxProc); // 사용자로부터 A4 장 수 입력받음
 
         lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();    // 테스트할 때 이미지 열기 귀찮아서 한가인 사진으로 설정해놓음
         g_hPenPapaer = CreatePen(PS_SOLID, 1, RGB(109, 202, 185));
+    }
         return 0;
 
     case WM_DESTROY:        //윈도우가 파기될 때
@@ -1085,8 +1113,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             Print(hWnd); break;
 
         case IDM_ABOUT:
-            DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-            break;
+            DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About); break;
 
         case IDM_EXIT:
             DestroyWindow(hWnd); break;
@@ -1095,7 +1122,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   
     case WM_SETCURSOR:
         GetCursorPos(&P);
-        ScreenToClient(hWnd, &P); // 노트북 화면이 기준이 아니라 윈도우 메인 화면을 기준으로 함
+        ScreenToClient(hWnd, &P); // 노트북 화면이 기준이 아니라 작업 영역을 기준으로 함
         switch (GetDragingMode(hWnd, P))
         {
         case ADJUST_WIDTH:      SetCursor(LoadCursor(NULL, IDC_SIZEWE));      return TRUE;
@@ -1104,6 +1131,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case IN_TEXT_1:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         case IN_TEXT_2:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         case IN_TEXT_3:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case IN_CLIPART:        SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case LINE_CLIPART:      SetCursor(LoadCursor(NULL, IDC_SIZENWSE));    return TRUE;
         }
         break;
 
