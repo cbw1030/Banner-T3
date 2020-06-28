@@ -22,8 +22,12 @@
 #define IN_TEXT_2         20                    // 두 번째 이미지를 선택한 경우
 #define IN_TEXT_3         30                    // 세 번째 이미지를 선택한 경우
 
-#define IN_CLIPART        100                   // 첫 번째 클립아트 내부(위치 조정)를 선택한 경우
-#define LINE_CLIPART      200                   // 첫 번째 클립아트 경계선(크기 조절 위함)을 선택한 경우
+#define IN_CLIPART_1      100                   // 첫 번째 클립아트 내부(위치 조정)를 선택한 경우
+#define IN_CLIPART_2      101                   // 두 번째 클립아트 내부(위치 조정)를 선택한 경우
+#define IN_CLIPART_3      102                   // 세 번째 클립아트 내부(위치 조정)를 선택한 경우
+#define LINE_CLIPART_1    200                   // 첫 번째 클립아트 경계선(크기 조절 위함)을 선택한 경우
+#define LINE_CLIPART_2    201                   // 두 번째 클립아트 경계선(크기 조절 위함)을 선택한 경우
+#define LINE_CLIPART_3    202                   // 세 번째 클립아트 경계선(크기 조절 위함)을 선택한 경우
 
 #define PAPER_X_SIZE  2100                      // A4 가로 mm
 #define PAPER_Y_SIZE  2970                      // A4 세로 mm
@@ -77,9 +81,10 @@ static RECT     g_imgRect;                      // 이미지 좌표
 // 작업중인 클립아트 관련;
 static HENHMETAFILE g_hEnh;    
 static char         g_clipArtRoute[256];        // 클립아트 경로
-static int          g_clipArtSzX = 2100;
-static int          g_clipArtSzY = 2100;
-static RECT         g_clipArtRect;              // 클립아트를 그리는 좌표
+static int          g_clipArtSzX[3] = { PAPER_X_SIZE, PAPER_X_SIZE, PAPER_X_SIZE };
+static int          g_clipArtSzY[3] = { PAPER_Y_SIZE, PAPER_Y_SIZE, PAPER_Y_SIZE };
+static RECT         g_clipArtRect[3];              // 클립아트를 그리는 좌표
+static int          g_clipArtCnt = 0;
 
 //작업중인 A4 관련
 static bool g_A4Status = FALSE;                 // 사용자로부터 A4 장 수를 올바르게 입력받았는지 '상태'를 나타내는 변수
@@ -503,11 +508,15 @@ void WINAPI DrawClipArt(HWND hWnd, HDC hDC)
 
     // 클립아트 위치 조정(텍스트는 GetTextExtentPoint32 함수를 써서 동적으로 SIZE 구조체를 채우던데..)
     //SetRect(&g_clipArtRect, W2DX(g_clipArtRect.left), W2DY(g_clipArtRect.top), W2DX(g_clipArtRect.right), W2DY(g_clipArtRect.bottom));
-    printf("%d %d %d %d\n", g_clipArtRect.left, g_clipArtRect.top, g_clipArtRect.right, g_clipArtRect.bottom);
+    printf("[%d]: %d %d %d %d\n", g_clipArtCnt, g_clipArtRect[g_clipArtCnt].left,
+        g_clipArtRect[g_clipArtCnt].top, g_clipArtRect[g_clipArtCnt].right, g_clipArtRect[g_clipArtCnt].bottom);
     
     // 클립아트 크기 조절
-    SetRect(&g_clipArtRect, W2DX(0), W2DY(0), W2DX(g_clipArtSzX), W2DY(g_clipArtSzY));
-    PlayEnhMetaFile(hDC, g_hEnh, &g_clipArtRect);
+    for (int i = 0; i < g_clipArtCnt; i++)
+    {
+        SetRect(&g_clipArtRect[i], W2DX(0), W2DY(0), W2DX(g_clipArtSzX[i]), W2DY(g_clipArtSzY[i]));
+        PlayEnhMetaFile(hDC, g_hEnh, &g_clipArtRect[i]);
+    }
 }
 
 
@@ -536,7 +545,6 @@ void WINAPI DrawTextAll(HWND hWnd, HDC hDC)
         DeleteObject(hFont);
     }
 }
-
 
 
 
@@ -615,7 +623,9 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
     int  i, DragingMode = NO_SELECTED;
     HDC  hdc;
     RECT R;
-    static const int textMode[] = { IN_TEXT_1, IN_TEXT_2, IN_TEXT_3 };
+    static const int textMode[]         = { IN_TEXT_1, IN_TEXT_2, IN_TEXT_3 };
+    static const int clipArtLineMode[]  = { LINE_CLIPART_1, LINE_CLIPART_2, LINE_CLIPART_3 };
+    static const int clipArtInMode[]    = { IN_CLIPART_1, IN_CLIPART_2, IN_CLIPART_3 };
 
     hdc = GetDC(hWnd);
 
@@ -638,12 +648,18 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
 
     // -------클립아트 부분------
     // 클립아트 위치를 움직이는 부분
-    SetRect(&R, W2DX(g_clipArtRect.left), W2DY(g_clipArtRect.top), W2DX(g_clipArtRect.right), W2DY(g_clipArtRect.bottom));
-    if (PtInRect(&R, P)) { DragingMode = IN_CLIPART; goto ProcExit; }
+    /*for (i = 0; i < g_clipArtCnt; i++)
+    {
+        SetRect(&R, W2DX(g_clipArtRect[i].left), W2DY(g_clipArtRect[i].top), W2DX(g_clipArtRect[i].right), W2DY(g_clipArtRect[i].bottom));
+        if (PtInRect(&R, P)) { DragingMode = clipArtInMode[i]; goto ProcExit; }
+    }*/
 
     // 클립아트 사이즈를 조정하는 부분
-    SetRect(&R, W2DX(g_clipArtSzX) - CL, W2DY(g_clipArtSzY) - CL, W2DX(g_clipArtSzX) + CL, W2DY(g_clipArtSzY) + CL);
-    if (PtInRect(&R, P)) { DragingMode = LINE_CLIPART; goto ProcExit; }
+    for (i = 0; i < g_clipArtCnt; i++)
+    {
+        SetRect(&R, W2DX(g_clipArtSzX[i]) - CL, W2DY(g_clipArtSzY[i]) - CL, W2DX(g_clipArtSzX[i]) + CL, W2DY(g_clipArtSzY[i]) + CL);
+        if (PtInRect(&R, P)) { DragingMode = clipArtLineMode[i]; goto ProcExit; }
+    }
 
 ProcExit:
     ReleaseDC(hWnd, hdc);
@@ -669,12 +685,16 @@ void WINAPI HandleDragingMode(HWND hWnd, int DragingMode, int DX, int DY)
     case IN_TEXT_1:         i = 0;                                  goto AdjText;           // 첫 번째 텍스트
     case IN_TEXT_2:         i = 1;                                  goto AdjText;           // 두 번째 텍스트
     case IN_TEXT_3:         i = 2;                                  goto AdjText;           // 세 번째 텍스트
-    case IN_CLIPART:                                                goto AdjText;           // 클립아트 좌표 이동
-    case LINE_CLIPART:      g_clipArtSzX += DX; g_clipArtSzY += DY; break;                  // 클립아트 크기 조정
+    //case IN_CLIPART_1:      i = 0;                                  goto AdjText;           // 클립아트 좌표 이동
+    //case IN_CLIPART_2:      i = 1;                                  goto AdjText;           // 클립아트 좌표 이동
+    //case IN_CLIPART_3:      i = 2;                                  goto AdjText;           // 클립아트 좌표 이동
+    case LINE_CLIPART_1:    i = 0; g_clipArtSzX[i] += DX; g_clipArtSzY[i] += DY; break;     // 클립아트 크기 조정
+    case LINE_CLIPART_2:    i = 1; g_clipArtSzX[i] += DX; g_clipArtSzY[i] += DY; break;     // 클립아트 크기 조정
+    case LINE_CLIPART_3:    i = 2; g_clipArtSzX[i] += DX; g_clipArtSzY[i] += DY; break;     // 클립아트 크기 조정
 
     AdjText:
         OffsetRect(&g_textRect[i], DX, DY);
-        OffsetRect(&g_clipArtRect, DX, DY);
+        //OffsetRect(&g_clipArtRect[i], DX, DY);
     }
 
     DrawSizeInfoLine(hWnd);
@@ -1016,7 +1036,7 @@ void WINAPI AddTextProc(HWND hWnd)
         InvalidateRect(hWnd, NULL, TRUE); // WndProc 내 WM_PAINT 메시지가 다시 발생한다.
     }
     else
-        MessageBox(hWnd, "텍스는 3개까지 추가가 가능합니다.", "알림", MB_OK);
+        MessageBox(hWnd, "텍스트는 3개까지 추가가 가능합니다.", "알림", MB_OK);
 }
 
 
@@ -1029,11 +1049,22 @@ void WINAPI AddClipArtProc(HWND hWnd)
     char szFileName[MAX_PATH];
     szFileName[0] = 0;
 
-    if (OpenImage(hWnd, szFileName, sizeof(szFileName), "클립아트(WMF 또는 EMF) 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) return;
-    SetWindowText(g_hEditFileToBeOpened, szFileName);
-    lstrcpy(g_clipArtRoute, szFileName);    // 이미지를 오픈 할때와는 다름(이미지는 editbox에 경로가 넣어졌기 때문에)
+    if (g_clipArtCnt < 3)
+    {
+        if (OpenImage(hWnd, szFileName, sizeof(szFileName), "클립아트(WMF 또는 EMF) 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) 
+            return;
 
-    InvalidateRect(hWnd, NULL, TRUE);
+        SetWindowText(g_hEditFileToBeOpened, szFileName);
+        lstrcpy(g_clipArtRoute, szFileName);    // 이미지를 오픈 할때와는 다름(이미지는 editbox에 경로가 넣어졌기 때문에)
+        InvalidateRect(hWnd, NULL, TRUE);
+    }
+    else
+        MessageBox(hWnd, "클립아트는 3개까지 추가가 가능합니다.", "알림", MB_OK);
+    //if (OpenImage(hWnd, szFileName, sizeof(szFileName), "클립아트(WMF 또는 EMF) 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) return;
+    //SetWindowText(g_hEditFileToBeOpened, szFileName);
+    //lstrcpy(g_clipArtRoute, szFileName);    // 이미지를 오픈 할때와는 다름(이미지는 editbox에 경로가 넣어졌기 때문에)
+
+    //InvalidateRect(hWnd, NULL, TRUE);
 }
 
 
@@ -1107,7 +1138,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             AddTextProc(hWnd); break;
 
         case ID_ADD_CLIPART:
-            AddClipArtProc(hWnd); break;
+            AddClipArtProc(hWnd); g_clipArtCnt++; break;
 
         case ID_PRINT:
             Print(hWnd); break;
@@ -1131,8 +1162,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         case IN_TEXT_1:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         case IN_TEXT_2:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
         case IN_TEXT_3:         SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
-        case IN_CLIPART:        SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
-        case LINE_CLIPART:      SetCursor(LoadCursor(NULL, IDC_SIZENWSE));    return TRUE;
+        case IN_CLIPART_1:      SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case IN_CLIPART_2:      SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case IN_CLIPART_3:      SetCursor(LoadCursor(NULL, IDC_HAND));        return TRUE;
+        case LINE_CLIPART_1:    SetCursor(LoadCursor(NULL, IDC_SIZENWSE));    return TRUE;
+        case LINE_CLIPART_2:    SetCursor(LoadCursor(NULL, IDC_SIZENWSE));    return TRUE;
+        case LINE_CLIPART_3:    SetCursor(LoadCursor(NULL, IDC_SIZENWSE));    return TRUE;
         }
         break;
 
