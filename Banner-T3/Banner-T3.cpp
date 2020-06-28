@@ -1051,20 +1051,17 @@ void WINAPI AddClipArtProc(HWND hWnd)
 
     if (g_clipArtCnt < 3)
     {
+        // 클립아트를 열다가 '취소'를 누르는 경우는 return
         if (OpenImage(hWnd, szFileName, sizeof(szFileName), "클립아트(WMF 또는 EMF) 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) 
             return;
 
         SetWindowText(g_hEditFileToBeOpened, szFileName);
         lstrcpy(g_clipArtRoute, szFileName);    // 이미지를 오픈 할때와는 다름(이미지는 editbox에 경로가 넣어졌기 때문에)
         InvalidateRect(hWnd, NULL, TRUE);
+        g_clipArtCnt++;
     }
     else
         MessageBox(hWnd, "클립아트는 3개까지 추가가 가능합니다.", "알림", MB_OK);
-    //if (OpenImage(hWnd, szFileName, sizeof(szFileName), "클립아트(WMF 또는 EMF) 파일을 선택하세요", "Meta File\0*.?MF\0") == FALSE) return;
-    //SetWindowText(g_hEditFileToBeOpened, szFileName);
-    //lstrcpy(g_clipArtRoute, szFileName);    // 이미지를 오픈 할때와는 다름(이미지는 editbox에 경로가 넣어졌기 때문에)
-
-    //InvalidateRect(hWnd, NULL, TRUE);
 }
 
 
@@ -1138,7 +1135,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             AddTextProc(hWnd); break;
 
         case ID_ADD_CLIPART:
-            AddClipArtProc(hWnd); g_clipArtCnt++; break;
+            AddClipArtProc(hWnd); break;
 
         case ID_PRINT:
             Print(hWnd); break;
