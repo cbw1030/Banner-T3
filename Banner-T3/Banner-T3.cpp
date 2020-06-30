@@ -412,7 +412,7 @@ void WINAPI SaveTextInfo(HWND hWnd)
     HFONT hFont, oldFont;
     SIZE  S;
 
-    if (g_textStrArr[g_textCnt] == NULL)
+    if (g_textStrArr[g_textCnt] == NULL) 
     {
         g_textSz[g_textCnt] = GetDlgItemInt(hWnd, IDSIZE, NULL, FALSE) * 10;
         g_textStrArr[g_textCnt] = (char*)malloc(1024);
@@ -631,10 +631,12 @@ int WINAPI GetDragingMode(HWND hWnd, POINT P)
     HDC  hdc;
     RECT R;
     static const int textMode[]         = { IN_TEXT_1, IN_TEXT_2, IN_TEXT_3 };
-    static const int clipArtLineMode[]  = { 
+    static const int clipArtLineMode[]  = 
+    { 
         LINE_CLIPART_1_WIDTH,  LINE_CLIPART_1_HEIGHT,   LINE_CLIPART_1_DIAGONAL,  
         LINE_CLIPART_2_WIDTH , LINE_CLIPART_2_HEIGHT ,  LINE_CLIPART_2_DIAGONAL,  
-        LINE_CLIPART_3_WIDTH , LINE_CLIPART_3_HEIGHT ,  LINE_CLIPART_3_DIAGONAL }; 
+        LINE_CLIPART_3_WIDTH , LINE_CLIPART_3_HEIGHT ,  LINE_CLIPART_3_DIAGONAL 
+    }; 
 
     hdc = GetDC(hWnd);
 
@@ -707,7 +709,7 @@ void WINAPI HandleDragingMode(HWND hWnd, int DragingMode, int DX, int DY)
 
     AdjText:
         OffsetRect(&g_textRect[i], DX, DY);
-        //OffsetRect(&g_clipArtRect[i], DX, DY);
+        //OffsetRect(&g_clipArtRect[i], DX, DY); 클립아트 위치 이동시킬때 사용하기 위함
     }
 
     DrawSizeInfoLine(hWnd);
@@ -1121,7 +1123,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         while (!g_A4Status)
             DialogBox(hInst, MAKEINTRESOURCE(IDD_INIT_DLG), hWnd, A4DialogBoxProc); // 사용자로부터 A4 장 수 입력받음
 
-        lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();    // 테스트할 때 이미지 열기 귀찮아서 한가인 사진으로 설정해놓음
+        //lstrcpy(g_imgRoute, "girl.bmp"); LoadBmpImage();    // 테스트할 때 이미지 열기 귀찮아서 한가인 사진으로 설정해놓음
         g_hPenPapaer = CreatePen(PS_SOLID, 1, RGB(109, 202, 185));
     }
     return 0;
@@ -1256,11 +1258,8 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     // Windows 프로그래밍에서 콘솔을 출력하는 소스코드
-    AllocConsole();
-    freopen("CONOUT$", "wt", stdout);
-    //CONOUT$ - console 창
-    //wt - 텍스트 쓰기 모드
-    //stdout - 출력될 파일 포인터(모니터로 지정)
+    //AllocConsole();
+    //freopen("CONOUT$", "wt", stdout); // CONOUT$ - console 창, stdout - 출력될 파일 포인터(모니터로 지정)
 
     // 전역 문자열을 초기화합니다.
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
