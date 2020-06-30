@@ -1,7 +1,7 @@
 # 현수막 제작 프로그램
 A4 용지를 이어붙여 원하는 크기의 현수막을 제작하기 위함
   
-## :smile: Athor
+## :smile: Author
 > [조재희](https://github.com/cbw1030)
 
 ## :man_juggling: 구현기능
