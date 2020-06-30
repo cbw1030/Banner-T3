@@ -27,6 +27,10 @@ A4 용지를 이어붙여 원하는 크기의 현수막을 제작하기 위함
 >- OLE(Object Linked Embedded) 적용하지 못함
 >- 클립아트를 이동시키지 못함(텍스트는 GetTextExtentPoint32 함수(동적으로 텍스트의 길이를 반환)를 사용하면 되지만, 클립아트는 위와 같은 함수가 존재하지 않아 이동을 못 시킴)
 
+## :open_mouth: 첨부자료
+>- MSDN Reference
+>- http://www.soen.kr WINAPI 입문 강좌와 Reference 
+
 ## :page_facing_up: Notes
 > - Visual Studio 2019 사용
 > - 프린트링크 인턴 개인 프로젝트
